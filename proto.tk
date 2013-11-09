@@ -1,0 +1,899 @@
+#!/usr/local/bin/wish
+
+# Prototype for Synopsys TCL/TK GUI Position
+# Look at readme.txt for more info
+# Start Date: Nov4, 2013
+# Deadline: Nov7, 2013
+# Developer: RV (rv@gmail.com)
+# All code (c)2013 R.V. Subramanyan All rights reserved.
+
+package require Tk
+package require Tktable
+package require tooltip
+package require struct
+
+#define normal 0 - normal drawing mode
+#define selected 1 - some inst(s) selected
+#define filterConns 2 - show the selected insts and their connected insts only
+
+namespace eval GUI {
+	set cnvs false
+	set hsb false
+	set vsb false
+	set cmdWin false
+	set statusWin false
+	set cmd "Command Window"
+	set status "Status Window"
+	set winWidth -1
+	set winHeight -1
+	set vpWidth -1
+	set vpHeight -1
+	set vpMinWidth -1
+	set vpMinHeight -1
+	set vpX 0
+	set vpY 0
+	set pinOffset 4
+	set selection ""
+	set instRects [dict create]
+	set rgnRects [dict create]
+	set splashOver false
+	set mode 0; #0 is normal, 1 is some inst selected, 2 is to show conns of the selected inst
+	font create myFont -family Helvetica -size 20 -weight bold
+	font create myFont1 -family Arial -size 15
+	font create tinyFont -family Arial -size 10
+	set slave [interp create slave]
+	#$slave eval "puts \"executing slave\""
+	interp alias slave nlInst {} nlInst
+	interp alias slave nlNet {} nlNet
+	interp alias slave nlRegion {} nlRegion
+	set logo [image create photo -file data/snps_logo.gif]
+	set RV [image create photo -file data/rv.gif]
+
+	proc calcWinDimensions {w} {
+		#puts "1 calcWinDims: $w $GUI::winWidth, $GUI::winHeight"
+		set GUI::winWidth [winfo width $w]
+		set GUI::winHeight [winfo height $w]
+		if {$GUI::splashOver} {
+			if {-1 != $nl::chipWidth} {
+				if {-1 == $GUI::vpWidth} {
+					GUI::setDefaultViewport
+				}
+				#puts "2 calcWinDims: $GUI::winWidth, $GUI::winHeight"
+				GUI::draw $w
+			}
+		} else {
+			GUI::splashScreen $w
+		}
+	}
+
+	proc splashScreen {w} {
+		$w delete all
+		set xcen [expr $GUI::winWidth / 2]
+		#puts "1. splashScreen wid is $GUI::winWidth xcen is $xcen"
+		set title "TCL/TK Prototype for Vineet Rashingkar"
+		$w create text $xcen 100 -text $title -font myFont -fill darkblue -tag foo
+		$w create text $xcen 125 -text "by RV" -font myFont1 -fill darkgreen -tag foo
+		$w create image [expr $xcen - 125] 250 -image $GUI::logo -tag foo
+		$w create image [expr $xcen + 125] 250 -image $GUI::RV -tag foo
+		set GUI::status "Press <Return> key to move forward"
+	}
+
+	proc setDefaultViewport {} {
+		set GUI::vpX 0
+		set GUI::vpY 0
+		set GUI::vpWidth $nl::chipWidth
+		set GUI::vpHeight $nl::chipHeight
+		set GUI::vpMinWidth [expr $GUI::vpWidth / 16 ]
+		set GUI::vpMinHeight [expr $GUI::vpHeight / 16 ]
+		#set GUI::status "Displaying the entire design"
+	}
+
+	proc zoomOut {w} {
+		#puts "1. ZoomOut $w x,y,wid,hei $GUI::vpX $GUI::vpY $GUI::vpWidth $GUI::vpHeight"
+		if {-1 == $GUI::vpWidth} {
+			GUI::setDefaultViewport
+		}
+		if {$GUI::vpWidth < $nl::chipWidth} {
+			set tmp [expr 2 * $GUI::vpWidth]
+			if {$tmp > $nl::chipWidth} {
+				GUI::setDefaultViewport
+			} else {
+				set GUI::vpX [expr $GUI::vpX - ($GUI::vpWidth/2)]
+				if {0 > $GUI::vpX} {
+					set GUI::vpX 0
+				}
+				set GUI::vpY [expr $GUI::vpY - ($GUI::vpHeight/2)]
+				if {0 > $GUI::vpY} {
+					set GUI::vpY 0
+					set GUI::status "Cannot zoom out any more"
+				}
+				set GUI::vpWidth $tmp
+				set GUI::vpHeight [expr 2 * $GUI::vpHeight]
+			}
+		}
+		GUI::draw $w
+		#puts "2. ZoomOut x,y,wid,hei $GUI::vpX $GUI::vpY $GUI::vpWidth $GUI::vpHeight"
+	}
+
+	proc zoomIn {w} {
+		#puts "1. ZoomIn $w x,y,wid,hei $GUI::vpX $GUI::vpY $GUI::vpWidth $GUI::vpHeight"
+		if {-1 == $GUI::vpWidth} {
+			GUI::setDefaultViewport
+		}
+		set tmp [expr $GUI::vpWidth / 2]
+		if {$tmp > $GUI::vpMinWidth} {
+			set GUI::vpWidth $tmp
+			set GUI::vpHeight [expr $GUI::vpHeight / 2]
+			set GUI::vpX [expr $GUI::vpX + ($GUI::vpWidth/2)]
+			set GUI::vpY [expr $GUI::vpY + ($GUI::vpHeight/2)]
+			GUI::draw $w
+		} else {
+			set GUI::status "Cannot zoom in any more"
+		#puts "2. ZoomIn x,y,wid,hei $GUI::vpX $GUI::vpY $GUI::vpWidth $GUI::vpHeight"
+		}
+	}
+
+	proc showInfo {w} {
+		#puts "1. showInfo w is $w"
+		if { ("" == $GUI::selection) } {
+			set info "Design has $nl::instId insts; $nl::rgnId regions; $nl::netId nets"
+		} else {
+			set val [dict get $nl::insts $GUI::selection]
+			set numIns [dict get $val numInputs]
+			set numOuts [dict get $val numOutputs]
+			set rgn [dict get $val region]
+			if { ("" == $rgn) } {
+				set info "Inst $GUI::selection has $numIns inputs $numOuts outputs. It has not been assigned to any region"
+			} else {
+				set info "$GUI::selection has $numIns inputs $numOuts outputs. It has been assigned to $rgn."
+			}
+		}
+		#puts "2. info is $info"
+	}
+
+	proc draw {w} {
+		$w delete all
+		GUI::drawChip $w
+		GUI::drawRegions $w
+		GUI::drawInsts $w
+		GUI::drawNets $w
+		set first [expr (1.0*$GUI::vpX)/$nl::chipWidth]
+		set last [expr (1.0*($GUI::vpX+$GUI::vpWidth))/$nl::chipWidth]
+		#puts "1 draw: vpX vpWidth chipWidth first last $GUI::vpX $GUI::vpWidth $nl::chipWidth $first $last"
+		$GUI::hsb set $first $last
+		$GUI::cnvs xview moveto $first
+		set first [expr 1.0 - (1.0*$GUI::vpY)/$nl::chipHeight]
+		set last [expr 1.0 - (1.0*($GUI::vpY+$GUI::vpHeight))/$nl::chipHeight]
+		#puts "2 draw: vpY vpHeight chipHeight first last $GUI::vpY $GUI::vpHeight $nl::chipHeight $first $last"
+		$GUI::vsb set $last $first
+		$GUI::cnvs yview moveto $first
+		#puts "3 draw: h nowat [$GUI::cnvs xview] v nowat [$GUI::cnvs yview]"
+		$w raise text
+	}
+
+	proc getX {x} {
+		# We use 80% horizontal area for drawing
+		#puts "1. getX $x $GUI::winWidth $GUI::vpWidth $GUI::vpX $nl::chipWidth"
+		#return [expr (0.1*$GUI::winWidth) + [expr (0.8*$x*$GUI::winWidth/$nl::chipWidth)]]
+		set x1 [expr (round ((0.1*$GUI::winWidth) + [expr (0.8*($x-$GUI::vpX)*$GUI::winWidth/$GUI::vpWidth)]))]
+		#puts "2. getX in, out: $x $x1"
+		return $x1
+	}
+
+	proc getY {y} {
+		# We use 80% vertical area for drawing.
+		# UI y starts at top, normal y starts at bottom.
+		#puts "1. getY $y $GUI::winHeight $nl::chipHeight"
+		#return [expr (0.9*$GUI::winHeight) - [expr (0.8*$y*$GUI::winHeight/$nl::chipHeight)]]
+		set y1 [expr (round ((0.9*$GUI::winHeight) - [expr (0.8*($y-$GUI::vpY)*$GUI::winHeight/$GUI::vpHeight)]))]
+		#puts "2. getY in, out: $y $y1"
+		return $y1
+	}
+
+	proc drawChip {win} {
+		set w [GUI::getX $nl::chipWidth]
+		set h [GUI::getY $nl::chipHeight]
+		set x0 [GUI::getX 0]
+		set y0 [GUI::getY 0]
+		#puts "drawChip: $x0 $y0 $w $h"
+		set c [$win create rectangle $x0 $y0 $w $h -outline red -width 3]
+		set tooltipText "Design Info\n# of Insts: $nl::instId\n# of Regions: $nl::rgnId\n# of Nets: $nl::netId"
+		tooltip::tooltip $win -item $c $tooltipText
+	}
+
+	proc drawRegions {win} {
+		#puts "0 drawRegions: winWid,Hei are $GUI::winWidth, $GUI::winHeight"
+		foreach item [dict keys $nl::rgns] {
+			set val [dict get $nl::rgns $item]
+			#puts "1 drawRegions: $item is $val"
+			set x [dict get $val x]
+			set y [dict get $val y]
+			set w [dict get $val width]
+			set h [dict get $val height]
+			#puts "2 drawRegions: x y wid hei are $x $y $w $h"
+			set x1 [GUI::getX $x]
+			set y1 [GUI::getY $y]
+			set w1 [GUI::getX [expr $w + $x]]
+			set h1 [GUI::getY [expr $h + $y]]
+			#puts "3 drawRegions: x1 y1 x2 y2 are $x1 $y1 $w1 $h1"
+			set r [$win create rectangle $x1 $y1 $w1 $h1 -dash {2 4} -outline blue -tag rgn]
+			dict set GUI::rgnRects $item x1 $x1
+			dict set GUI::rgnRects $item y1 $y1
+			dict set GUI::rgnRects $item x2 $w1
+			dict set GUI::rgnRects $item y2 $h1
+			set tooltipText "Region: $item"
+			tooltip::tooltip $win -item $r $tooltipText
+			#puts "4 drawRegions rgns are $GUI::rgns"
+			set xstr [expr ($x1 + $w1)/2]
+			set ystr [expr ($y1 + $h1) /2]
+			#puts "5 drawRegions: $xstr $ystr box is $x1 $y1 $w1 $h1 txt is $item"
+			$win create text $xstr $ystr -text $item -fill blue -tag rgn -tag text
+		}
+	}
+
+	proc drawOneInst {win inst} {
+		set val [dict get $nl::insts $inst]
+		#puts "1 drawOneInst: $inst is $val"
+		set x [dict get $val x]
+		set y [dict get $val y]
+		set w [dict get $val width]
+		set h [dict get $val height]
+		#puts "2 drawOneInst: $x $y $w $h"
+		set x1 [GUI::getX $x]
+		set y1 [GUI::getY $y]
+		set w1 [GUI::getX [expr $w + $x]]
+		set h1 [GUI::getY [expr $h + $y]]
+		#puts "3 drawOneInst: $x1 $y1 $w1 $h1"
+		set lw 1
+		set color darkgreen
+		if {$inst == $GUI::selection} {
+			set lw 3
+			set color red3
+		}
+		set item [$win create rectangle $x1 $y1 $w1 $h1 -width $lw -outline $color -tag inst]
+		dict set GUI::instRects $inst x1 $x1
+		dict set GUI::instRects $inst y1 $y1
+		dict set GUI::instRects $inst x2 $w1
+		dict set GUI::instRects $inst y2 $h1
+		#puts "4 drawOneInst instRects are $GUI::instRects"
+
+		set xstr [expr ($x1 + $w1)/2]
+		set ystr [expr ($y1 + $h1) /2]
+		#puts "5 drawOneInst: $xstr $ystr box is $x1 $y1 $w1 $h1 txt is $name"
+		$win create text $xstr $ystr -text $inst -fill darkgreen -tag inst -tag text
+
+#Draw Pins
+		set ins [dict get $val numInputs]
+		set outs [dict get $val numOutputs]
+		set numPorts [expr $ins + $outs]
+		set ih [expr ($h1-$y1) / [expr $ins+1]]
+		set oh [expr ($h1-$y1) / [expr $outs+1]]
+		set mid [expr (($y1 + $h1)/2)]
+		if { (1.0 > $ih) } {
+# No space to draw all pins
+			set x2 [expr $x1-(4*$GUI::pinOffset)]
+			$win create line $x1 $mid $x2 $mid -width 2 -fill blue -tag inst
+			set xx1 [expr $x2 + $GUI::pinOffset]
+			set xy1 [expr $mid - (2*$GUI::pinOffset)]
+			set xx2 [expr $x2 + (2*$GUI::pinOffset)]
+			set xy2 [expr $mid + (2*$GUI::pinOffset)]
+			$win create line $xx1 $xy1 $xx2 $xy2 -fill blue -tag inst
+			$win create text $xx2 $xy1 -text $ins -font tinyFont -fill blue -tag inst -tag text
+		} else {
+			set ypos [expr $y1 + $ih]
+			set x2 [expr $x1-$GUI::pinOffset]
+			for {set i 0} {$i < $numIns} {incr i} {
+				#puts "7 drawOneInst: pin# $i"
+				#puts "8 drawOneInst: x1 is $x1, ypos is $ypos, x2 is $x2"
+				$win create line $x1 $ypos $x2 $ypos -width 2 -fill blue -tag inst
+				set ypos [expr $ypos + $ih]
+			}
+		}
+		if { (1.0 > $oh) } {
+# No space to draw all pins
+			set x2 [expr $w1+(4*$GUI::pinOffset)]
+			$win create line $w1 $mid $x2 $mid -width 2 -fill blue -tag inst
+			set xx1 [expr $x2 - $GUI::pinOffset]
+			set xy1 [expr $mid - (2*$GUI::pinOffset)]
+			set xx2 [expr $x2 - (2*$GUI::pinOffset)]
+			set xy2 [expr $mid + (2*$GUI::pinOffset)]
+			$win create line $xx1 $xy1 $xx2 $xy2 -fill blue -tag inst
+			$win create text $xx2 $xy1 -text $outs -font tinyFont -fill blue -tag inst -tag text
+		} else {
+			set x2 [expr $w1+$GUI::pinOffset]
+			set ypos [expr $y1 + $oh]
+			for {set i $numIns} {$i < $numPorts} {incr i} {
+				$win create line $x1 $ypos $x2 $ypos -fill darkgreen -tag inst
+				set ypos [expr $ypos + $oh]
+			}
+		}
+#tooltip
+		set tooltipText "$inst\nInputs:$ins\nOutputs:$outs"
+		set rgn [dict get $val region]
+		if { ("" != $rgn) } {
+			set tooltipText "$toolTipText\nAssigned to: $rgn"
+		}
+		tooltip::tooltip $win -item $item $tooltipText
+	}
+
+	proc drawInsts {win} {
+		if { (2 == $GUI::mode) && ("" != $GUI::selection) } {
+			#puts "filterConns, drawing $GUI::selection"
+			GUI::drawOneInst $win $GUI::selection
+			set inst [dict get $nl::insts $GUI::selection]
+			set conns [dict get $inst connectedInsts]
+			foreach item [dict keys $conns] {
+				#puts "1 drawInsts: inst is $item"
+				GUI::drawOneInst $win $item
+			}
+		} else {
+			foreach item [dict keys $nl::insts] {
+				GUI::drawOneInst $win $item
+			}
+		}
+	}
+
+	proc drawNets {win} {
+		foreach item [dict keys $nl::nets] {
+			set val [dict get $nl::nets $item]
+			#puts "1 drawNets: $item is $val"
+			set from [dict get $val from]
+			set to [dict get $val to]
+			#puts "2 drawNets: $from $to"
+			set fromInstName [string range $from 0 [expr ([string last . $from]) - 1]]
+			set toInstName [string range $to 0 [expr ([string last . $to]) - 1]]
+			if { "" != $GUI::selection} {
+				if { (2 == $GUI::mode) && ($GUI::selection != $fromInstName) && ($GUI::selection != $toInstName) } {
+					continue
+				}
+			}
+			set fromPin [string range $from [expr ([string last . $from]) + 1] [string length $from]]
+			set toPin [string range $to [expr ([string last . $to]) + 1] [string length $to]]
+			#puts "3 drawNets: fromInst is $fromInstName fromPin is $fromPin toInst is $toInstName toPin is $toPin"
+			set  fromInst [dict get $nl::insts $fromInstName]
+			set  toInst [dict get $nl::insts $toInstName]
+			#puts "4 drawNets: fromInst is $fromInst toInst is $toInst"
+
+			set fromX [expr [dict get $fromInst x] + [dict get $fromInst width]]
+			set fromYBase [dict get $fromInst y]
+			set numIns [dict get $fromInst numInputs]
+			set numOuts [dict get $fromInst numOutputs]
+			set fromYOff [expr ([expr $fromPin - $numIns] * [dict get $fromInst height]) / [expr $numOuts+1]]
+			set fromY [expr $fromYBase + $fromYOff]
+			#puts "5 drawNets: fromX is $fromX fromYbase is $fromYBase fromYOff is $fromYOff fromY is $fromY"
+
+			set toX [dict get $toInst x]
+			set toYBase [dict get $toInst y]
+			set numIns [dict get $toInst numInputs]
+			set toYOff [expr ($toPin * [dict get $toInst height]) / [expr $numIns+1]]
+			set toY [expr $toYBase + $toYOff]
+			#puts "6 drawNets: toX is $toX toYbase is $toYBase toYOff is $toYOff toY is $toY"
+
+			set fx [expr [GUI::getX $fromX] + $GUI::pinOffset]
+			set fy [GUI::getY $fromY]
+			set tx [expr [GUI::getX $toX] - $GUI::pinOffset]
+			set ty [GUI::getY $toY]
+			set mx [expr ($fx+$tx)/2]
+			set netCoords [list]
+			lappend netCoords $fx $fy
+			#lappend netCoords $mx $fy
+			#lappend netCoords $mx $ty
+			lappend netCoords $tx $ty
+			$win create line $netCoords -fill purple -width 2 -tag net
+		}
+	}
+
+	proc vertScroll {args} {
+		set nowat [$GUI::cnvs yview]
+		set scrollPos [$GUI::vsb get]
+		set start [lindex $scrollPos 0]
+		#puts "1. vertScroll args is $args nowat $nowat scrollPos is $scrollPos start is $start"
+		set cmdList [split $args]
+		#puts "2. vertScroll cmdList is $cmdList"
+		switch [lindex $cmdList 0] {
+			"scroll" {
+				set foo [lindex $cmdList 2]
+				set count [lindex $cmdList 1]
+				if {[string first units $foo] >= 0} {
+					set incr [expr 1 * $count]
+				} else {
+					set incr [expr $GUI::vpHeight * $count]
+				}
+				#puts "3 vertScroll: incr is $incr"
+				set GUI::vpY [expr $GUI::vpY - $incr]
+				#puts "4 vertScroll: vpY is $GUI::vpY"
+				if {0 > $GUI::vpY} {
+					set GUI::vpY 0
+				}
+				#puts "5 vertScroll: vpY is $GUI::vpY"
+			}
+			"moveto" {
+				#puts "6 vertScroll: moveto"
+				set top [lindex $cmdList 1]
+				if {0.0 > $top} {
+					set top 0.0
+				}
+				#puts "7 vertScroll: moveto top is $top"
+				set GUI::vpY [expr $nl::chipHeight * $top]
+				#puts "8 vertScroll: moveto vpY is $GUI::vpY"
+			}
+		}
+		GUI::draw $GUI::cnvs
+	}
+
+	proc horizScroll {args} {
+		set nowat [$GUI::cnvs xview]
+		set scrollPos [$GUI::hsb get]
+		set start [lindex $scrollPos 0]
+		#puts "1. horizScroll args is $args nowat $nowat scrollPos is $scrollPos start is $start"
+		set cmdList [split $args]
+		#puts "2. horizScroll cmdList is $cmdList"
+		switch [lindex $cmdList 0] {
+			"scroll" {
+				#puts "3 horizScroll: scroll"
+				set foo [lindex $cmdList 2]
+				#puts "4 horizScroll: unit is $foo"
+				set count [lindex $cmdList 1]
+				if {[string first units $foo] >= 0} {
+					set incr [expr 1 * $count]
+					#puts "5 horizScroll: incr is $count units"
+				} else {
+					set incr [expr $GUI::vpWidth * $count]
+					#puts "6 horizScroll: incr is $count pages"
+				}
+				#puts "7 horizScroll: incr is $incr"
+				set GUI::vpX [expr $GUI::vpX + $incr]
+				#puts "8 horizScroll: vpX is $GUI::vpX"
+				if {0 > $GUI::vpX} {
+					set GUI::vpX 0
+				}
+				#puts "9 horizScroll: vpX is $GUI::vpX"
+			}
+			"moveto" {
+				#puts "10 horizScroll: moveto"
+				set frac [lindex $cmdList 1]
+				if {0.0 > $frac} {
+					set frac 0.0
+				}
+				#puts "11 horizScroll: moveto frac is $frac"
+				set GUI::vpX [expr $nl::chipWidth * $frac]
+				#puts "12 horizScroll: moveto vpX is $GUI::vpX"
+			}
+		}
+		GUI::draw $GUI::cnvs
+	}
+
+	proc killSplash {w} {
+		#puts "1. killSplash: w is $w"
+		$w delete foo
+		if {! $GUI::splashOver} {
+			set GUI::splashOver true
+		}
+		GUI::calcWinDimensions $w
+		set GUI::status ""
+	}
+
+	proc clearSelection {w} {
+		#puts "1. clearSelection: w is $w"
+		set GUI::selection ""
+		set GUI::mode 0
+		GUI::calcWinDimensions $w
+		set GUI::status "Selection cleared"
+	}
+
+	proc showInstConnectivity {inst} {
+		#puts "1. ShowInstConnectivity inst is $inst"
+		set GUI::selection $inst
+		GUI::calcWinDimensions $GUI::cnvs
+	}
+
+	proc findInst {x y} {
+		foreach item [dict keys $GUI::instRects] {
+			set val [dict get $GUI::instRects $item]
+			#puts "1 findInst item is $item val is $val"
+			set x1 [dict get $val x1]
+			#puts "2 findInst: x1 is $x1"
+			if {$x1 > $x} { continue }
+			set x2 [dict get $val x2]
+			#puts "3 findInst: x2 is $x2"
+			if {$x2 < $x} { continue }
+			set y1 [dict get $val y1]
+			#puts "4 findInst: y1 is $y1"
+			if {$y1 < $y} { continue }
+			set y2 [dict get $val y2]
+			#puts "5 findInst: y2 is $y2"
+			if {$y2 > $y} { continue }
+			#puts "6 findInst: inst is $item"
+			return $item
+		}
+		#puts "7 findInst: no inst at click"
+		return ""
+	}
+
+	proc selectInst {w x y} {
+		#puts "1 selectInst w x y are $w $x $y"
+		set inst [findInst $x $y]
+		set GUI::selection $inst
+		if { $inst != "" } {
+			set GUI::mode 1
+			draw $w
+			#puts "2 selectInst inst is $inst mode is $GUI::mode"
+			set GUI::status "Selected instance: $inst"
+		} else {
+			set GUI::mode 0
+		}
+	}
+
+	proc filterConns {w x y} {
+		#puts "1 filterConns w x y are $w $x $y"
+		set inst [findInst $x $y]
+		set GUI::selection $inst
+		if { $inst != "" } {
+			set GUI::mode 2
+			draw $w
+			set GUI::status "Showing connections for instance $inst"
+			#puts "2 filterConns inst is $inst mode is $GUI::mode"
+		} else {
+			set GUI::mode 0
+		}
+	}
+
+	proc showAbout {} {
+		tk_messageBox -message "Prototype for Vineet Rashingkar\nVersion: 0.1\nAuthor: RV" -title "About SynProto"
+	}
+
+	proc openDesign {} {
+		set types {
+			{{TCL Scripts} {.tcl}}
+			{{All Files} *}
+		}
+		set response [tk_getOpenFile -filetypes $types]
+		nlLoadDesign $response
+		draw $GUI::cnvs
+		set GUI::status "Loaded script $response"
+	}
+
+	proc saveDesign {} {
+		set response [tk_getSaveFile -title Save -defaultextension tcl -parent .]
+		if {("" == $response)} {
+			return; # Cancel was clicked.
+		}
+		nlSaveDesign $response
+	}
+
+	proc clearDesign {} {
+		nlClearDesign
+		draw $GUI::cnvs
+	}
+
+	proc execCmd {} {
+		puts "Command is $GUI::cmd"
+	}
+}
+
+namespace eval nl {
+	set instId 0
+	set insts [dict create]
+
+	set chipWidth -1
+	set chipHeight -1
+
+	set rgnId 0
+	set rgns [dict create]
+
+	set netId 0
+	set nets [dict create]
+}
+
+proc nlInst {name args} {
+	set id $nl::instId
+	incr nl::instId
+
+	set legalOpts {-type -numInputs -numOutputs -parent -x -y -width -height -region}
+
+	set props [dict create id $id type macro numInputs 2 numOutputs 1 parent false x 5 y 5 width 100 height 100 region ""]
+
+	set index -1
+	foreach {opt val} $args {
+		if {-1 == [lsearch $legalOpts $opt]} {
+			error "Unknown option $opt"
+		}
+		if {[incr index 2] > [llength $args]} {
+			error "Value for $opt missing"
+		}
+		set prop [string range $opt 1 end]
+		dict set props $prop $val
+	}
+
+	set pins [dict create]
+	set numIns [expr [dict get $props numInputs]]
+	set numPins [expr $numIns + [dict get $props numOutputs]]
+	for {set i 0} {$i < $numPins} {incr i} {
+		dict append pins $i $i
+	}
+	#puts "1 nlInst: [dict values $pins]"
+	dict append props ports $pins
+	set conns [dict create]
+	dict append props connectedInsts $conns
+
+	dict append nl::insts $name $props
+	#puts "2 nlInst: [dict values $nl::insts]"
+
+	set xMax [expr [dict get $props x] + [dict get $props width] ]
+	if {$xMax > $nl::chipWidth} {
+		#puts "3 nlInst: resetting chip width: old val is $nl::chipWidth, new val is [expr 1.25 * $xMax]"
+		set nl::chipWidth [expr 1.25 * $xMax]
+	}
+	set yMax [expr [dict get $props y] + [dict get $props height] ]
+	if {$yMax > $nl::chipHeight} {
+		#puts "4 nlInst: resetting chip height: old val is $nl::chipHeight, new val is [expr 1.25 * $yMax]"
+		set nl::chipHeight [expr 1.25 * $yMax]
+	}
+	set GUI::status "Created instance $name"
+}
+
+proc nlNet {args} {
+	set id $nl::netId
+	incr nl::netId
+
+	set legalOpts {-name -from -to}
+
+	set props [dict create name "" from false to false]
+
+	set index -1
+	set from false
+	set to false
+	set name ""
+	foreach {opt val} $args {
+		if {-1 == [lsearch $legalOpts $opt]} {
+			error "Unknown option $opt"
+		}
+		if {[incr index 2] > [llength $args]} {
+			error "Value for $opt missing"
+		}
+		if {"-from" == $opt} {
+			dict set props from $val
+			set from $val
+		} elseif {"-to" == $opt} {
+			dict set props to $val
+			set to $val
+		} else {
+			dict set props name $val
+			set name $val
+			#puts "name is $val"
+		}
+	}
+	dict append nl::nets $id $props
+	#puts "1 nlNet: [dict values $nl::nets]"
+
+	set fromInstName [string range $from 0 [expr ([string last . $from]) - 1]]
+	set toInstName [string range $to 0 [expr ([string last . $to]) - 1]]
+	set fromInst [dict get $nl::insts $fromInstName]
+	set toInst [dict get $nl::insts $toInstName]
+	set fromConns [dict get $fromInst connectedInsts]
+	#puts "2 nlNet fromConns is $fromConns"
+	#set pins [dict get $nl::insts $fromInstName ports]
+	#puts "3 nlNet pins is $pins"
+	if {! [dict exists $fromConns $toInstName] } {
+		#puts "4 nlNet adding $toInstName to conns of $fromInstName"
+		dict append fromConns $toInstName $toInstName
+		dict set nl::insts $fromInstName connectedInsts $fromConns
+		#puts "5 nlNet fromInst is [dict get $nl::insts $fromInstName]"
+	}
+	set toConns [dict get $toInst connectedInsts]
+	if {! [dict exists $toConns $fromInstName] } {
+		#puts "6 nlNet adding $fromInstName to conns of $toInstName"
+		dict append toConns $fromInstName $fromInstName
+		dict set nl::insts $toInstName connectedInsts $toConns
+		#puts "7 nlNet fromInst is [dict get $nl::insts $fromInstName]"
+	}
+	set GUI::status "Created net $name"
+}
+
+proc nlRegion {name args} {
+	set id $nl::rgnId
+	incr nl::rgnId
+
+	set legalOpts {-x -y -width -height}
+
+	set props [dict create id $id x 5 y 5 width 100 height 100]
+
+	set index -1
+	foreach {opt val} $args {
+		if {-1 == [lsearch $legalOpts $opt]} {
+			error "Unknown option $opt"
+		}
+		if {[incr index 2] > [llength $args]} {
+			error "Value for $opt missing"
+		}
+		set prop [string range $opt 1 end]
+		dict set props $prop $val
+	}
+	dict append nl::rgns $name $props
+	#puts "1 nlRegion. [dict values $nl::rgns]"
+
+	set xMax [expr [dict get $props x] + [dict get $props width] ]
+	if {$xMax > $nl::chipWidth} {
+		#puts "2 nlRegion: resetting chip width: old val is $nl::chipWidth, new val is [expr 1.25 * $xMax]"
+		set nl::chipWidth [expr 1.25 * $xMax]
+	}
+	set yMax [expr [dict get $props y] + [dict get $props height] ]
+	if {$yMax > $nl::chipHeight} {
+		#puts "3 nlRegion: resetting chip height: old val is $nl::chipHeight, new val is [expr 1.25 * $yMax]"
+		set nl::chipHeight [expr 1.25 * $yMax]
+	}
+	set GUI::status "Created region $name"
+}
+
+proc nlSaveDesign {fileName} {
+	set fp [open $fileName w]
+	foreach item [dict keys $nl::insts] {
+		set val [dict get $nl::insts $item]
+		set type [dict get $val type]
+		set ins [dict get $val numInputs]
+		set outs [dict get $val numOutputs]
+		set parent [dict get $val parent]
+		set x [dict get $val x]
+		set y [dict get $val y]
+		set width [dict get $val width]
+		set height [dict get $val height]
+		set rgn [dict get $val region]
+		set str "nlInst $item -type $type -numInputs $ins -numOutputs $outs -parent $parent -x $x -y $y -width $width -height $height"
+		if {("" != $rgn)} {
+			set str "$str -region $rgn"
+		}
+		puts $fp $str
+	}
+	foreach item [dict keys $nl::nets] {
+		set val [dict get $nl::nets $item]
+		set from [dict get $val from]
+		set to [dict get $val to]
+		set name [dict get $val name]
+		#puts "net name is $name"
+		if {("" != $name)} {
+			set str "nlNet -name $name -from $from -to $to"
+		} else {
+			set str "nlNet -from $from -to $to"
+		}
+		puts $fp $str
+	}
+	foreach item [dict keys $nl::rgns] {
+		set val [dict get $nl::rgns $item]
+		set x [dict get $val x]
+		set y [dict get $val y]
+		set width [dict get $val width]
+		set height [dict get $val height]
+		set val [dict get $nl::rgns $item]
+		set str "nlRegion $item -x $x -y $y -width $width -height $height"
+		puts $fp $str
+	}
+	close $fp
+}
+
+proc nlLoadDesign {fileName} {
+	set fp [open $fileName r]
+	set design [read $fp]
+	set data [split $design "\n"]
+	foreach line $data {
+		$GUI::slave eval $line
+	}
+	close $fp
+}
+
+proc nlClearDesign {} {
+	foreach item [dict keys $nl::insts] {
+		dict unset nl::insts $item
+	}
+	puts "1. nlClearDesign. insts: $nl::insts"
+	foreach item [dict keys $nl::nets] {
+		dict unset nl::nets $item
+	}
+	puts "2. nlClearDesign. nets: $nl::nets"
+	foreach item [dict keys $nl::rgns] {
+		dict unset nl::rgns $item
+	}
+	puts "3. nlClearDesign. rgns: $nl::rgns"
+	set nl::chipWidth -1
+	set nl::chipHeighth -1
+}
+
+wm title . "TK GUI Prototype for Synopsys"
+
+pack [ttk::frame .f] -anchor nw -expand 1 -fill both
+set GUI::cnvs [tk::canvas .f.cnvs -width 1000 -heigh 500 -bg gray]
+set GUI::vsb [ttk::scrollbar .f.vsb -orient vertical -command GUI::vertScroll]
+set GUI::hsb [ttk::scrollbar .f.hsb -orient horizontal -command GUI::horizScroll]
+ttk::label .f.corner
+set GUI::cmdWin [ttk::entry .f.cmd -textvariable GUI::cmd]
+#ttk::button .f.go -text "Go" -command GUI::execCmd
+set GUI::statusWin [ttk::label .f.status -textvariable GUI::status]
+
+pack .f -fill both -expand 1
+grid .f.cnvs .f.vsb -sticky news
+grid .f.hsb .f.corner -sticky news
+grid .f.hsb .f.corner -sticky news
+#grid .f.cmd .f.go -sticky news
+grid .f.cmd -columnspan 2 -sticky news
+grid .f.status -columnspan 2 -sticky news
+grid rowconfigure .f 0 -weight 1
+grid rowconfigure .f 1 -weight 0
+grid rowconfigure .f 2 -weight 0
+grid rowconfigure .f 3 -weight 0
+grid columnconfigure .f 0 -weight 1
+grid columnconfigure .f 1 -weight 0
+
+menu .menubar
+. configure -menu .menubar
+set File [menu .menubar.file]
+.menubar add cascade -label File -menu .menubar.file
+$File add command -label "Open..." -accelerator "Command-O" -underline 0 -command GUI::openDesign
+$File add command -label "Save..." -accelerator "Command-S" -underline 0 -command GUI::saveDesign
+$File add command -label "Clear Design" -accelerator "Command-X" -underline 0 -command GUI::clearDesign
+$File add command -label "Quit SynProto" -accelerator "Command-Q" -underline 0 -command exit
+
+set Help [menu .menubar.help]
+.menubar add cascade -label Help -menu .menubar.help
+$Help add command -label "About SynProto..." -accelerator "F1" -underline 0 -command GUI::showAbout
+
+focus $GUI::cnvs
+
+#bind $GUI::cnvs <1> { puts "Mouse"}
+#bind $GUI::cnvs <KeyPress> { puts "Keypress"}
+#bind $GUI::cnvs "<Command-Key-minus>" { GUI::zoomOut %W}
+#bind $GUI::cnvs "<Command-Key-plus>" { GUI::zoomIn %W}
+
+bind $GUI::cnvs <Configure> {GUI::calcWinDimensions %W}
+bind $GUI::cnvs <1> {GUI::selectInst %W %x %y}
+bind $GUI::cnvs <Double-1> {GUI::filterConns %W %x %y}
+bind $GUI::cnvs "<Key Z>" { GUI::zoomOut %W}
+bind $GUI::cnvs "<Key z>" { GUI::zoomIn %W}
+bind $GUI::cnvs "<Key Escape>" { GUI::clearSelection %W}
+bind $GUI::cnvs "<Key Return>" { GUI::killSplash %W}
+bind $GUI::cnvs "<Key Down>" { GUI::vertScroll scroll 1 unit}
+bind $GUI::cnvs "<Key Up>" { GUI::vertScroll scroll -1 unit}
+bind $GUI::cnvs "<Key Left>" { GUI::horizScroll scroll -1 unit}
+bind $GUI::cnvs "<Key Right>" { GUI::horizScroll scroll 1 unit}
+bind .f.cmd <Return> { GUI::execCmd }
+bind . <Control-KeyPress-c> { exit }
+bind . "<Key F1>" {GUI::showAbout}
+bind . "<Command-f>" {GUI::openDesign}
+bind . "<Command-s>" {GUI::saveDesign}
+bind . "<Command-x>" {GUI::clearDesign}
+bind . "<Command-q>" {exit}
+
+set nl::chipWidth 40000
+set nl::chipHeight 20000
+
+set x 100
+set y 100
+for {set i 0} {$i<10} {incr i} {
+	nlInst inst$i -numInputs 50 -numOutputs 50 -x $x -y $y -width 2000 -height 1000
+	set x [expr $x + 4000]
+	set y [expr $y + 2000]
+}
+for {set i 0} {$i<9} {incr i} {
+	for {set j 0} {$j<50} {incr j} {
+		nlNet -name net{$i}_[expr 50+$j]_[expr $i+1]_$j -from inst$i.[expr 50+$j] -to inst[expr $i+1].$j
+	}
+}
+nlNet -name feedback -from inst2.50 -to inst1.0
+
+set x 1000
+set y 7500
+for {set i 0} {$i<5} {incr i} {
+	nlRegion rgn$i -x $x -y $y -width 3000 -height 6000
+	set x [expr $x + 8000]
+}
+
+#puts "1 main: numInsts is $nl::instId [dict values $nl::insts]\n"
+#puts "2 main: numRegions is $nl::rgnid[dict values $nl::rgns]\n"
+#puts "3 main: numNets is $nl::netId [dict values $nl::nets]\n"
+
+#nlLoadDesign "test.tcl"
+
+#GUI::showInstConnectivity inst5
+#GUI::calcWinDimensions $GUI::cnvs
+
+#nlClearDesign
+#nlSaveDesign "foo.tcl"
+
