@@ -25,7 +25,7 @@ pack [ttk::frame .f] -anchor nw -expand 1 -fill both
 # Purpose: To draw the schematic
 # Empty label widget at the intersection of the scrollbars for grid layout
 # Alternative is to just set one of the scrollbars to 2 rows (cols) wide
-set GUI::cnvs [tk::canvas .f.cnvs -width 1000 -heigh 500 -bg gray]
+set GUI::cnvs [tk::canvas .f.cnvs -width 1000 -heigh 500 -bg white]
 set GUI::vsb [ttk::scrollbar .f.vsb -orient vertical -command GUI::vertScroll]
 set GUI::hsb [ttk::scrollbar .f.hsb -orient horizontal -command GUI::horizScroll]
 ttk::label .f.corner

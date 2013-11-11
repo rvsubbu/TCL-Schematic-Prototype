@@ -39,6 +39,7 @@ namespace eval GUI {
 	# To draw pins etc. Does not depend on chip dimensions.
 	set pinOffset 4;
 	font create tinyFont -family Arial -size 10; # for port names
+	set pinDisplay true
 	
 	#  To find inst/rgn from a click, store rects on canvas for them
 	set instRects [dict create];
@@ -67,6 +68,8 @@ namespace eval GUI {
 	set slave [interp create slave]
 	# Slave interpreter aliases. These aliases are executed from cmdWdgt
 	#	and loadDesign.
+	interp alias slave setPinDisplay {} GUI::setPinDisplay
+	interp alias slave goIntoRegion {} GUI::goIntoRgn
 	interp alias slave nlSetChipWidth {} nl::setChipWidth
 	interp alias slave nlSetChipHeight {} nl::setChipHeight
 	interp alias slave nlInst {} nl::makeInst
@@ -82,8 +85,9 @@ namespace eval GUI {
 	interp alias slave showInstConnections {} GUI::showInstConns
 	interp alias slave selectRegion {} GUI::setSelectRgn
 	interp alias slave unselectRegion {} GUI::unselectRgn
+	interp alias slave regionInfo {} GUI::rgnInfo
+	interp alias slave regionFlylines {} GUI::rgnFlylines
 	interp alias slave assignInstToRegion {} GUI::assignInstToRgn
-	interp alias slave regionInfo {} GUI::regionInfo
 	interp alias slave showRegionConnections {} GUI::showRgnConns
 	interp alias slave selectNet {} GUI::setSelectNet
 	interp alias slave unselectNet {} GUI::unselectNet
@@ -197,11 +201,16 @@ namespace eval GUI {
 
 	proc showInfo {} {
 		set prevFn [dbg::enterFn showInfo]
-		if { "" == $GUI::selectedInst } {
-			designInfo
-		} else {
+		if { "" != $GUI::selectedInst } {
 			instInfo $GUI::selectedInst
 		}
+		if { "" != $GUI::selectedRgn } {
+			rgnInfo $GUI::selectedRgn
+		}
+		if { "" != $GUI::selectedNet } {
+			netInfo $GUI::selectedNet
+		}
+		designInfo
 		dbg::exitFn $prevFn
 	}
 
@@ -228,7 +237,7 @@ namespace eval GUI {
 			$GUI::vsb set $last $first
 			$GUI::cnvs yview moveto $first
 			dbg::msg "h nowat [$GUI::cnvs xview] v nowat [$GUI::cnvs yview]"
-			$GUI::cnvs raise text
+			#$GUI::cnvs raise text
 		}
 		dbg::exitFn $prevFn
 	}
@@ -308,10 +317,10 @@ namespace eval GUI {
 			set h1 [GUI::getY [expr $h + $y]]
 			dbg::msg "x1 y1 x2 y2 are $x1 $y1 $w1 $h1"
 			set color blue
-			set lw 1
+			set lw 3
 			if {$rgn == $GUI::selectedRgn} {
 				dbg::msg "$rgn is selected"
-				set lw 3
+				set lw 5
 				set color red
 			} else {
 				dbg::msg "$rgn is not selected"
@@ -322,6 +331,13 @@ namespace eval GUI {
 			dict set GUI::rgnRects $rgn x2 $w1
 			dict set GUI::rgnRects $rgn y2 $h1
 			set tooltipText "Region: $rgn"
+			set insts [dict get $val insts]
+			if { 0 < [dict size $insts] } {
+				set tooltipText "$tooltipText: [dict size $insts] assignments - "
+				foreach inst [dict keys $insts] {
+					set tooltipText "$tooltipText $inst"
+				}
+			}
 			tooltip::tooltip $GUI::cnvs -item $item $tooltipText
 			dbg::msg "rgnRects are $GUI::rgnRects"
 			set xstr [expr ($x1 + $w1)/2]
@@ -378,33 +394,39 @@ namespace eval GUI {
 		if { (1.0 > $ih) } {
 # No space to draw all pins
 			set x2 [expr $x1-(4*$GUI::pinOffset)]
-			$GUI::cnvs create line $x1 $mid $x2 $mid -width 2 -fill blue -tag inst -tag $inst
+			$GUI::cnvs create line $x1 $mid $x2 $mid -width 2 -fill gray -tag inst -tag $inst
 			set xx1 [expr $x2 + $GUI::pinOffset]
 			set xy1 [expr $mid - (2*$GUI::pinOffset)]
 			set xx2 [expr $x2 + (2*$GUI::pinOffset)]
 			set xy2 [expr $mid + (2*$GUI::pinOffset)]
-			$GUI::cnvs create line $xx1 $xy1 $xx2 $xy2 -fill blue -tag inst -tag $inst
-			$GUI::cnvs create text $xx2 $xy1 -text $ins -font tinyFont -fill blue -tag inst -tag text -tag $inst
+			$GUI::cnvs create line $xx1 $xy1 $xx2 $xy2 -fill gray -tag inst -tag $inst
+			dbg::msg "pindisplay is $GUI::pinDisplay"
+			if { $GUI::pinDisplay } {
+				$GUI::cnvs create text $xx2 $xy1 -text $ins -font tinyFont -fill gray -tag inst -tag text -tag $inst
+			}
 		} else {
 			set ypos [expr $y1 + $ih]
 			set x2 [expr $x1-$GUI::pinOffset]
 			for {set i 0} {$i < $numIns} {incr i} {
 				dbg::msg "pin# $i"
 				dbg::msg "x1 is $x1, ypos is $ypos, x2 is $x2"
-				$GUI::cnvs create line $x1 $ypos $x2 $ypos -width 2 -fill blue -tag inst -tag $inst
+				$GUI::cnvs create line $x1 $ypos $x2 $ypos -width 2 -fill gray -tag inst -tag $inst
 				set ypos [expr $ypos + $ih]
 			}
 		}
 		if { (1.0 > $oh) } {
 # No space to draw all pins
 			set x2 [expr $w1+(4*$GUI::pinOffset)]
-			$GUI::cnvs create line $w1 $mid $x2 $mid -width 2 -fill blue -tag inst -tag $inst
+			$GUI::cnvs create line $w1 $mid $x2 $mid -width 2 -fill gray -tag inst -tag $inst
 			set xx1 [expr $x2 - [expr 3 * $GUI::pinOffset]]
 			set xy1 [expr $mid - (2*$GUI::pinOffset)]
 			set xx2 [expr $x2 - $GUI::pinOffset]
 			set xy2 [expr $mid + (2*$GUI::pinOffset)]
-			$GUI::cnvs create line $xx1 $xy1 $xx2 $xy2 -fill blue -tag inst -tag $inst
-			$GUI::cnvs create text $xx2 $xy1 -text $outs -font tinyFont -fill blue -tag inst -tag text -tag $inst
+			$GUI::cnvs create line $xx1 $xy1 $xx2 $xy2 -fill gray -tag inst -tag $inst
+			dbg::msg "pindisplay is $GUI::pinDisplay"
+			if { $GUI::pinDisplay } {
+				$GUI::cnvs create text $xx2 $xy1 -text $outs -font tinyFont -fill gray -tag inst -tag text -tag $inst
+			}
 		} else {
 			set x2 [expr $w1+$GUI::pinOffset]
 			set ypos [expr $y1 + $oh]
@@ -492,7 +514,7 @@ namespace eval GUI {
 	}
 
 	proc drawNet {netName {highlight false} } {
-		set prevFn [dbg::enterFn drawOnlyNetsOfSelectedRgn]
+		set prevFn [dbg::enterFn drawNet]
 		set val [dict get $nl::nets $netName]
 		dbg::msg "net is $val"
 		set from [dict get $val from]
@@ -534,7 +556,7 @@ namespace eval GUI {
 		#lappend netCoords $mx $ty
 		lappend netCoords $tx $ty
 		set lw 1
-		set color purple
+		set color gray
 		if {$highlight} {
 			set lw 3
 			set color red
@@ -547,7 +569,7 @@ namespace eval GUI {
 	}
 
 	proc drawNetsOfInst {instName} {
-		set prevFn [dbg::enterFn drawOnlyNetsOfSelectedRgn]
+		set prevFn [dbg::enterFn drawNetsOfInst]
 		set inst [dict get $nl::insts $instName]
 		set nets [dict get $inst nets]
 		foreach net [dict keys $nets] {
@@ -931,6 +953,22 @@ namespace eval GUI {
 		dbg::exitFn $prevFn
 	}
 
+	proc rgnInfo {rgn} {
+		set prevFn [dbg::enterFn rgnInfo]
+		set val [dict get $nl::rgns $rgn]
+		set insts [dict get $val insts]
+		set info ""
+		if { 0 < [dict size $insts] } {
+			set info "Assigns: [dict size $insts] instances"
+			foreach inst [dict keys $insts] {
+				set info "$info\n$inst\n"
+			}
+		}
+		set title "$rgn Info"
+		tk_messageBox -message $info -title -title
+		dbg::exitFn $prevFn
+	}
+
 	proc netInfo {net} {
 		set prevFn [dbg::enterFn netInfo]
 		set info ""
@@ -988,6 +1026,7 @@ namespace eval GUI {
 
 	proc assignInstToRgn {inst rgn x y {considerGeometry true} } {
 		set prevFn [dbg::enterFn assignInstToRgn]
+		dbg::msg "GUI assignInst - $inst $rgn $x $y"
 		nl::assignInstToRgn $inst $rgn $x $y $considerGeometry
 		GUI::drawSchematic
 		dbg::exitFn $prevFn
@@ -1075,6 +1114,7 @@ namespace eval GUI {
 				set newX [getChipX $nX1]
 				set newY [getChipY $nY1]
 				dbg::msg "inst was at $oldX1 $oldY1, to be moved to $nX1 $nY1, chip is $newX $newY"
+				dbg::msg "endDnd assignInst - $GUI::dndInstName $rgn $newX $newY"
 				GUI::assignInstToRgn $GUI::dndInstName $rgn $newX $newY
 			} else {
 				GUI::drawSchematic
@@ -1115,6 +1155,58 @@ namespace eval GUI {
 	}
 
 	proc drawPort {portName} {
+	}
+
+	proc setPinDisplay {v} {
+		set prevFn [dbg::enterFn setPinDisplay]
+		set GUI::pinDisplay $v
+		dbg::msg "v is $v pindisplay is $GUI::pinDisplay"
+		GUI::drawSchematic
+		dbg::exitFn $prevFn
+	}
+
+	proc goIntoRgn {rgnName} {
+		set prevFn [dbg::enterFn goIntoRgn]
+		set rgn [dict get $nl::rgns $rgnName]
+		set GUI::vpX [dict get $rgn x]
+		set GUI::vpY [dict get $rgn y]
+		set GUI::vpWidth [dict get $rgn width]
+		set GUI::vpHeight [dict get $rgn height]
+		set GUI::vpMinWidth [expr $GUI::vpWidth / 16 ]
+		set GUI::vpMinHeight [expr $GUI::vpHeight / 16 ]
+		GUI::drawSchematic
+		dbg::exitFn $prevFn
+	}
+
+	proc rgnFlylines {rgnName} {
+		set prevFn [dbg::enterFn rgnFlylines]
+		if {! [dict exists $GUI::rgnRects $rgnName] } {
+			return
+		}
+		set rgn [dict get $GUI::rgnRects $rgnName]
+		setSelectRgn rgnName
+		set x1 [dict get $rgn x1]
+		set y1 [dict get $rgn y1]
+		set x2 [dict get $rgn x2]
+		set y2 [dict get $rgn y2]
+		set lw 5
+		set color red
+		set item [$GUI::cnvs create rectangle $x1 $y1 $x2 $y2 -width $lw -dash {2 4} -outline $color -fill white -tag rgnflyline -tag $rgnName]
+		set nlrgn [dict get $nl::rgns $rgnName]
+		set insts [dict get $nlrgn insts]
+		set tooltipText "$rgnName:"
+		if { 0 < [dict size $insts] } {
+			set tooltipText "$tooltipText: [dict size $insts] instances: "
+			foreach inst [dict keys $insts] {
+				set tooltipText "$tooltipText,$inst"
+			}
+		}
+		tooltip::tooltip $GUI::cnvs -item $item $tooltipText
+		set xstr [expr ($x1 + $x2)/2]
+		set ystr [expr ($y1 + $y2) /2]
+		dbg::msg "$xstr $ystr box is $x1 $y1 $x2 $y2 txt is $rgnName"
+		$GUI::cnvs create text $xstr $ystr -text $rgnName -fill blue -tag rgn -tag rgnflyline -tag $rgnName -tag text
+		dbg::exitFn $prevFn
 	}
 }
 

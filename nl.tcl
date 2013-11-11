@@ -300,7 +300,7 @@ namespace eval nl {
 				set geometryError true
 			}
 			if { $geometryError } {
-				GUI::error "inst is going out of the region, cannot make the assignment\nRegion box is $rgnX1 $rgnY1 $rgnX2 $rgnY1\nRequested inst box is $x $y $x2 $y2"
+				GUI::error "inst $instName is going out of the region $rgnName, cannot make the assignment\nRegion box is $rgnX1 $rgnY1 $rgnX2 $rgnY1\nRequested inst box is $x $y $x2 $y2"
 				dbg::exitFn $prevFn
 				return
 			}
@@ -310,9 +310,9 @@ namespace eval nl {
 		dict set nl::insts $instName region $rgnName
 		#dict set [dict get $nl::insts $instName] y $y
 		#dict set [dict get $nl::insts $instName] region $rgnName
-		dbg::msg "$instName: [dict get $nl::insts $instName]"
+		#dbg::msg "$instName: [dict get $nl::insts $instName]"
 		dict set nl::rgns $rgnName insts $instName true
-		dbg::msg "$rgnName: [dict get $nl::rgns $rgnName]"
+		#dbg::msg "$rgnName: [dict get $nl::rgns $rgnName]"
 		dbg::exitFn $prevFn
 	}
 
