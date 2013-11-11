@@ -8,7 +8,9 @@
 #define selected 1 - some inst(s) selected
 #define filterConns 2 - show the selected insts and their connected insts only
 
+
 namespace eval GUI {
+
 	# Widgets
 	set cnvs false; # Canvas Widget where the schematic is drawn
 	set hsb false; # Horizontal Scrollbar
@@ -42,6 +44,13 @@ namespace eval GUI {
 	set instRects [dict create];
 	set rgnRects [dict create];
 
+	# Drag and Drop setup
+	set dndStartX -1
+	set dndStartY -1
+	set dndOldX -1
+	set dndOldY -1
+	set dndInstName ""
+
 	# For initial splash screen
 	set splashOver false; # is splash done?
 	font create splashTitleFont -family Helvetica -size 20 -weight bold
@@ -58,6 +67,8 @@ namespace eval GUI {
 	set slave [interp create slave]
 	# Slave interpreter aliases. These aliases are executed from cmdWdgt
 	#	and loadDesign.
+	interp alias slave nlSetChipWidth {} nl::setChipWidth
+	interp alias slave nlSetChipHeight {} nl::setChipHeight
 	interp alias slave nlInst {} nl::makeInst
 	interp alias slave nlNet {} nl::makeNet
 	interp alias slave nlRegion {} nl::makeRgn
@@ -79,19 +90,25 @@ namespace eval GUI {
 	interp alias slave netInfo {} GUI::netInfo
 	interp alias slave showNetConnections {} GUI::showNetConns
 
-	proc calcCnvsDimensions {w} {
-		set prevFn [dbg::enterFn calcCnvsDimensions]
-		dbg::msg "$w $GUI::cnvsWidth, $GUI::cnvsHeight"
+	proc calcCnvsDims {w} {
+		set prevFn [dbg::enterFn calcCnvsDims]
 		set GUI::cnvsWidth [winfo width $w]
 		set GUI::cnvsHeight [winfo height $w]
+		dbg::msg "$w $GUI::cnvsWidth, $GUI::cnvsHeight"
 		if {$GUI::splashOver} {
-			if {-1 != $nl::chipWidth} {
-				if {-1 == $GUI::vpWidth} {
+			dbg::msg "Splash over vpWidth is $GUI::vpWidth nlWidth is $nl::chipWidth"
+			if {-1 == $GUI::vpWidth} {
+				if {-1 != $nl::chipWidth} {
 					GUI::setDefaultViewport
 				}
 				dbg::msg "$GUI::cnvsWidth, $GUI::cnvsHeight"
-				GUI::drawSchematic
 			}
+			GUI::drawSchematic
+			#dbg::msg "ff is $GUI::ff"
+			#if { $GUI::ff } {
+				#dbg::msg "drawing ff $GUI::ff"
+				#GUI::drawFF 500 250
+			#}
 		} else {
 			GUI::splashScreen
 		}
@@ -229,9 +246,30 @@ namespace eval GUI {
 	proc getY {y} {
 		# Y Transformation - We use 80% vertical area for drawing.
 		set prevFn [dbg::enterFn getY]
-		# UI y starts at top, normal y starts at bottom.
+		# UI y starts at top, chip y starts at bottom.
 		dbg::msg "$y $GUI::cnvsHeight $nl::chipHeight"
 		set y1 [expr (round ((0.9*$GUI::cnvsHeight) - [expr (0.8*($y-$GUI::vpY)*$GUI::cnvsHeight/$GUI::vpHeight)]))]
+		dbg::msg "in, out: $y $y1"
+		dbg::exitFn $prevFn
+		return $y1
+	}
+
+	proc getChipX {x} {
+		# Reverse of getX
+		set prevFn [dbg::enterFn getChipX]
+		dbg::msg "$x $GUI::cnvsWidth $GUI::vpWidth $GUI::vpX $nl::chipWidth"
+		set x1 [expr $GUI::vpX + (1.25* $GUI::vpWidth * ($x- (0.1*$GUI::cnvsWidth)) / $GUI::cnvsWidth)]
+		dbg::msg "in, out: $x $x1"
+		dbg::exitFn $prevFn
+		return $x1
+	}
+
+	proc getChipY {y} {
+		# Reverse of getY
+		set prevFn [dbg::enterFn getChipY]
+		# UI y starts at top, chip y starts at bottom.
+		dbg::msg "$y $GUI::cnvsHeight $nl::chipHeight"
+		set y1 [expr $GUI::vpY + (1.25 * $GUI::vpHeight * ((0.9 * $GUI::cnvsHeight) - $y) / $GUI::cnvsHeight)]
 		dbg::msg "in, out: $y $y1"
 		dbg::exitFn $prevFn
 		return $y1
@@ -246,9 +284,9 @@ namespace eval GUI {
 		set x0 [GUI::getX 0]
 		set y0 [GUI::getY 0]
 		dbg::msg "$x0 $y0 $w $h"
-		set c [$GUI::cnvs create rectangle $x0 $y0 $w $h -outline red -width 3]
+		set item [$GUI::cnvs create rectangle $x0 $y0 $w $h -outline red -width 3]
 		set tooltipText "Design Info\n# of Insts: $nl::instId\n# of Regions: $nl::rgnId\n# of Nets: $nl::netId"
-		tooltip::tooltip $GUI::cnvs -item $c $tooltipText
+		tooltip::tooltip $GUI::cnvs -item $item $tooltipText
 		dbg::exitFn $prevFn
 	}
 
@@ -278,18 +316,18 @@ namespace eval GUI {
 			} else {
 				dbg::msg "$rgn is not selected"
 			}
-			set r [$GUI::cnvs create rectangle $x1 $y1 $w1 $h1 -width $lw -dash {2 4} -outline $color -tag rgn]
+			set item [$GUI::cnvs create rectangle $x1 $y1 $w1 $h1 -width $lw -dash {2 4} -outline $color -tag rgn -tag $rgn]
 			dict set GUI::rgnRects $rgn x1 $x1
 			dict set GUI::rgnRects $rgn y1 $y1
 			dict set GUI::rgnRects $rgn x2 $w1
 			dict set GUI::rgnRects $rgn y2 $h1
 			set tooltipText "Region: $rgn"
-			tooltip::tooltip $GUI::cnvs -item $r $tooltipText
+			tooltip::tooltip $GUI::cnvs -item $item $tooltipText
 			dbg::msg "rgnRects are $GUI::rgnRects"
 			set xstr [expr ($x1 + $w1)/2]
 			set ystr [expr ($y1 + $h1) /2]
 			dbg::msg "$xstr $ystr box is $x1 $y1 $w1 $h1 txt is $rgn"
-			$GUI::cnvs create text $xstr $ystr -text $rgn -fill blue -tag rgn -tag text
+			$GUI::cnvs create text $xstr $ystr -text $rgn -fill blue -tag rgn -tag $rgn -tag text
 		}
 		dbg::exitFn $prevFn
 	}
@@ -318,7 +356,7 @@ namespace eval GUI {
 			set lw 3
 			set color red
 		}
-		set item [$GUI::cnvs create rectangle $x1 $y1 $w1 $h1 -width $lw -outline $color -tag inst]
+		set item [$GUI::cnvs create rectangle $x1 $y1 $w1 $h1 -width $lw -outline $color -tag inst -tag $inst]
 		dict set GUI::instRects $inst x1 $x1
 		dict set GUI::instRects $inst y1 $y1
 		dict set GUI::instRects $inst x2 $w1
@@ -328,7 +366,7 @@ namespace eval GUI {
 		set xstr [expr ($x1 + $w1)/2]
 		set ystr [expr ($y1 + $h1) /2]
 		dbg::msg "$xstr $ystr box is $x1 $y1 $w1 $h1 txt is $inst"
-		$GUI::cnvs create text $xstr $ystr -text $inst -fill darkgreen -tag inst -tag text
+		$GUI::cnvs create text $xstr $ystr -text $inst -fill darkgreen -tag inst -tag text -tag $inst 
 
 #Draw Pins
 		set ins [dict get $val numInputs]
@@ -340,38 +378,38 @@ namespace eval GUI {
 		if { (1.0 > $ih) } {
 # No space to draw all pins
 			set x2 [expr $x1-(4*$GUI::pinOffset)]
-			$GUI::cnvs create line $x1 $mid $x2 $mid -width 2 -fill blue -tag inst
+			$GUI::cnvs create line $x1 $mid $x2 $mid -width 2 -fill blue -tag inst -tag $inst
 			set xx1 [expr $x2 + $GUI::pinOffset]
 			set xy1 [expr $mid - (2*$GUI::pinOffset)]
 			set xx2 [expr $x2 + (2*$GUI::pinOffset)]
 			set xy2 [expr $mid + (2*$GUI::pinOffset)]
-			$GUI::cnvs create line $xx1 $xy1 $xx2 $xy2 -fill blue -tag inst
-			$GUI::cnvs create text $xx2 $xy1 -text $ins -font tinyFont -fill blue -tag inst -tag text
+			$GUI::cnvs create line $xx1 $xy1 $xx2 $xy2 -fill blue -tag inst -tag $inst
+			$GUI::cnvs create text $xx2 $xy1 -text $ins -font tinyFont -fill blue -tag inst -tag text -tag $inst
 		} else {
 			set ypos [expr $y1 + $ih]
 			set x2 [expr $x1-$GUI::pinOffset]
 			for {set i 0} {$i < $numIns} {incr i} {
 				dbg::msg "pin# $i"
 				dbg::msg "x1 is $x1, ypos is $ypos, x2 is $x2"
-				$GUI::cnvs create line $x1 $ypos $x2 $ypos -width 2 -fill blue -tag inst
+				$GUI::cnvs create line $x1 $ypos $x2 $ypos -width 2 -fill blue -tag inst -tag $inst
 				set ypos [expr $ypos + $ih]
 			}
 		}
 		if { (1.0 > $oh) } {
 # No space to draw all pins
 			set x2 [expr $w1+(4*$GUI::pinOffset)]
-			$GUI::cnvs create line $w1 $mid $x2 $mid -width 2 -fill blue -tag inst
+			$GUI::cnvs create line $w1 $mid $x2 $mid -width 2 -fill blue -tag inst -tag $inst
 			set xx1 [expr $x2 - [expr 3 * $GUI::pinOffset]]
 			set xy1 [expr $mid - (2*$GUI::pinOffset)]
 			set xx2 [expr $x2 - $GUI::pinOffset]
 			set xy2 [expr $mid + (2*$GUI::pinOffset)]
-			$GUI::cnvs create line $xx1 $xy1 $xx2 $xy2 -fill blue -tag inst
-			$GUI::cnvs create text $xx2 $xy1 -text $outs -font tinyFont -fill blue -tag inst -tag text
+			$GUI::cnvs create line $xx1 $xy1 $xx2 $xy2 -fill blue -tag inst -tag $inst
+			$GUI::cnvs create text $xx2 $xy1 -text $outs -font tinyFont -fill blue -tag inst -tag text -tag $inst
 		} else {
 			set x2 [expr $w1+$GUI::pinOffset]
 			set ypos [expr $y1 + $oh]
 			for {set i $numIns} {$i < $numPorts} {incr i} {
-				$GUI::cnvs create line $x1 $ypos $x2 $ypos -fill darkgreen -tag inst
+				$GUI::cnvs create line $x1 $ypos $x2 $ypos -fill darkgreen -tag inst -tag $inst
 				set ypos [expr $ypos + $oh]
 			}
 		}
@@ -442,11 +480,11 @@ namespace eval GUI {
 		} elseif { 1 == $GUI::mode } {
 			drawOnlySelectedInst
 		} else {
-			foreach item [dict keys $nl::insts] {
-				if { $item == $GUI::selectedInst } {
-					GUI::drawOneInst $item true
+			foreach inst [dict keys $nl::insts] {
+				if { $inst == $GUI::selectedInst } {
+					GUI::drawOneInst $inst true
 				} else {
-					GUI::drawOneInst $item
+					GUI::drawOneInst $inst
 				}
 			}
 		}
@@ -501,10 +539,10 @@ namespace eval GUI {
 			set lw 3
 			set color red
 		}
-		set n [$GUI::cnvs create line $netCoords -fill $color -width $lw -tag net]
+		set item [$GUI::cnvs create line $netCoords -fill $color -width $lw -tag net -tag net$netName]
 #tooltip
 		set tooltipText "net $netName\nfrom: $fromInstName.$fromPin\nto: $toInstName.$toPin"
-		tooltip::tooltip $GUI::cnvs -item $n $tooltipText
+		tooltip::tooltip $GUI::cnvs -item $item $tooltipText
 		dbg::exitFn $prevFn
 	}
 
@@ -641,7 +679,7 @@ namespace eval GUI {
 		if {! $GUI::splashOver} {
 			set GUI::splashOver true
 		}
-		GUI::calcCnvsDimensions $w
+		GUI::calcCnvsDims $w
 		set GUI::status ""
 		dbg::exitFn $prevFn
 	}
@@ -654,7 +692,7 @@ namespace eval GUI {
 		set GUI::selectedNet ""
 		set GUI::mode 0
 		dbg::msg "mode is normal"
-		GUI::calcCnvsDimensions $w
+		GUI::calcCnvsDims $w
 		set GUI::status "Selection cleared"
 		dbg::exitFn $prevFn
 	}
@@ -664,9 +702,10 @@ namespace eval GUI {
 		# Maybe an inst or a rgn
 		set prevFn [dbg::enterFn findObj]
 		set ret ""
-		foreach item [dict keys $rectDict] {
-			set val [dict get $rectDict $item]
-			dbg::msg "item is $item val is $val"
+		dbg::msg "click at $x $y"
+		foreach obj [dict keys $rectDict] {
+			set val [dict get $rectDict $obj]
+			dbg::msg "obj is $obj val is $val"
 			set x1 [dict get $val x1]
 			dbg::msg "x1 is $x1"
 			if {$x1 > $x} { continue }
@@ -679,8 +718,8 @@ namespace eval GUI {
 			set y2 [dict get $val y2]
 			dbg::msg "y2 is $y2"
 			if {$y2 > $y} { continue }
-			dbg::msg "obj is $item"
-			set ret $item
+			dbg::msg "obj is $obj"
+			set ret $obj
 			break
 		}
 		dbg::exitFn $prevFn
@@ -690,25 +729,6 @@ namespace eval GUI {
 	proc findInst {x y} {
 		# See where the click falls among instRects and identify the inst.
 		set prevFn [dbg::enterFn findInst]
-		#foreach item [dict keys $GUI::instRects] {
-			#set val [dict get $GUI::instRects $item]
-			#dbg::msg "item is $item val is $val"
-			#set x1 [dict get $val x1]
-			#dbg::msg "x1 is $x1"
-			#if {$x1 > $x} { continue }
-			#set x2 [dict get $val x2]
-			#dbg::msg "x2 is $x2"
-			#if {$x2 < $x} { continue }
-			#set y1 [dict get $val y1]
-			#dbg::msg "y1 is $y1"
-			#if {$y1 < $y} { continue }
-			#set y2 [dict get $val y2]
-			#dbg::msg "y2 is $y2"
-			#if {$y2 > $y} { continue }
-			#dbg::msg "inst is $item"
-			#dbg::exitFn $prevFn
-			#return $item
-		#}
 		set ret [findObj $x $y $GUI::instRects]
 		if { "" == $ret } {
 			dbg::msg "no inst at click"
@@ -737,6 +757,11 @@ namespace eval GUI {
 			return
 		}
 		dbg::msg "w x y are $w $x $y"
+		set dnd [ $GUI::cnvs find closest $x $y ]
+		dbg::msg "dnd is $dnd"
+		#for {set i 0} {$i<100} {incr i} {
+		#	$GUI::cnvs move $dnd 1 1
+		#}
 		set obj [findInst $x $y]
 		dbg::msg "inst is $obj"
 		if { "" != $obj } {
@@ -791,6 +816,11 @@ namespace eval GUI {
 	proc filterConns {w x y} {
 		set prevFn [dbg::enterFn filterConns]
 		dbg::msg "w x y are $w $x $y"
+		set dnd [ $GUI::cnvs find closest $x $y ]
+		dbg::msg "dnd is $dnd"
+		#for {set i 0} {$i<100} {incr i} {
+			#$GUI::cnvs move $dnd -1 0
+		#}
 		set obj [findInst $x $y]
 		if { "" != $obj } {
 			dbg::msg "inst is $obj"
@@ -968,7 +998,123 @@ namespace eval GUI {
 		bell
 		set GUI::status $msg
 		tk_messageBox -message $msg -title "Error"
-		set prevFn [dbg::enterFn error]
+		dbg::exitFn $prevFn
+	}
+
+	proc pickInstForDnD { x y } {
+		set prevFn [dbg::enterFn pickInstForDnD]
+		global oldx oldy
+		$GUI::cnvs raise current
+		dbg::msg "x is $x y is $y"
+		set x [$GUI::cnvs canvasx $x]
+		set y [$GUI::cnvs canvasy $y]
+		dbg::msg "canvasx is $x canvasy is $y"
+		set instName GUI::findInst x y
+		if { "" != $instName } {
+			# We are set for Drag and Drop
+		}
+		set canvas($can,obj) [ $can find closest $x $y ]
+		set canvas($can,x) $x
+		set canvas($can,y) $y
+		dbg::exitFn $prevFn
+	}
+
+	proc startDnD { w x y } {
+		set prevFn [dbg::enterFn startDnD]
+		dbg::msg "w is $w x is $x y is $y"
+		if {$GUI::splashOver} {
+			set GUI::dndOldX $x
+			set GUI::dndOldY $y
+			set GUI::dndStartX $x
+			set GUI::dndStartY $y
+			set GUI::dndInstName [GUI::findInst $x $y]
+			if { "" != $GUI::dndInstName } {
+				# We are set for Drag and Drop
+				$w raise $GUI::dndInstName
+				#$w itemconfigure $GUI::dndInstName -outline red
+			}
+		} else {
+			GUI::killSplash $w
+		}
+		dbg::exitFn $prevFn
+	}
+
+	proc DnD { w x y } {
+		set prevFn [dbg::enterFn DnD]
+		dbg::msg "w is $w x is $x y is $y dndInstName is $GUI::dndInstName"
+		if { "" != $GUI::dndInstName } {
+			$w move $GUI::dndInstName [expr $x-$GUI::dndOldX] [expr $y-$GUI::dndOldY]
+			set GUI::dndOldX $x
+			set GUI::dndOldY $y
+		}
+		dbg::exitFn $prevFn
+	}
+
+	proc endDnD { w x y } {
+		set prevFn [dbg::enterFn endDnD]
+		dbg::msg "w is $w x is $x y is $y dndInstName is $GUI::dndInstName"
+		if { "" != $GUI::dndInstName } {
+			#$w itemconfigure $GUI::dndInstName -outline darkgreen
+			#dict set $nl::insts $dndInstName x [expr $oldX + $x - $GUI::dndStartX]
+			#dict set $nl::insts $dndInstName y [expr $oldX + $x - $GUI::dndStartY]
+			set rgn [GUI::findRgn $x $y]
+			set inst [dict get $GUI::instRects $GUI::dndInstName]
+			set oldX1 [dict get $inst x1]
+			set oldY1 [dict get $inst y1]
+			set oldX2 [dict get $inst x2]
+			set oldY2 [dict get $inst y2]
+			set nX1 [expr $oldX1 + $x - $GUI::dndStartX]
+			set nY1 [expr $oldY1 + $y - $GUI::dndStartY]
+			set nX2 [expr $oldX2 + $x - $GUI::dndStartX]
+			set nY2 [expr $oldY2 + $y - $GUI::dndStartY]
+			dict set $GUI::instRects inst x1 $nX1
+			dict set $GUI::instRects inst y1 $nY1
+			dict set $GUI::instRects inst x2 $nX2
+			dict set $GUI::instRects inst y2 $nY2
+			if { "" != $rgn } {
+				set newX [getChipX $nX1]
+				set newY [getChipY $nY1]
+				dbg::msg "inst was at $oldX1 $oldY1, to be moved to $nX1 $nY1, chip is $newX $newY"
+				GUI::assignInstToRgn $GUI::dndInstName $rgn $newX $newY
+			} else {
+				GUI::drawSchematic
+			}
+		}
+		GUI::selectObj $w $x $y
+		dbg::exitFn $prevFn
+	}
+
+	proc drawFF {x y} {
+		set prevFn [dbg::enterFn drawFF]
+		set ffWidth 75
+		set ffHeight 100
+		set ffOffset 5
+		set x2 [expr $x+$ffWidth]
+		set y2 [expr $y+$ffHeight]
+		dbg::msg "$x $y $x2 $y2"
+# FF Rect
+		$GUI::cnvs create rectangle $x $y $x2 $y2 -tag ff
+# Clk conn
+		set clkx2 [expr ($x+$x2)/2]
+		set clkx1 [expr $clkx2 - $ffOffset]
+		set clkx3 [expr $clkx2 + $ffOffset]
+		set clky2 [expr $y2 - (2*$ffOffset)]
+		$GUI::cnvs create line $clkx1 $y2 $clkx2 $clky2 -tag ff
+		$GUI::cnvs create line $clkx2 $clky2 $clkx3 $y2 -tag ff
+# Labels - S(et), R(eset), Q, Qbar
+		set lx1 [expr $x + (2*$ffOffset)]
+		set ly1 [expr $y + (2*$ffOffset)]
+		set lx2 [expr $x2 - (2*$ffOffset)]
+		set ly2 [expr $y2 - (2*$ffOffset)]
+		$GUI::cnvs create text $lx1 $ly1 -text "S" -tag ff
+		$GUI::cnvs create text $lx1 $ly2 -text "R" -tag ff
+		$GUI::cnvs create text $lx2 $ly1 -text "Q" -tag ff
+		$GUI::cnvs create text $lx2 $ly2 -text "Q'" -tag ff
+
+		dbg::exitFn $prevFn
+	}
+
+	proc drawPort {portName} {
 	}
 }
 

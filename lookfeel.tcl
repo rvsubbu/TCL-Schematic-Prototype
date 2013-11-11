@@ -37,8 +37,11 @@ grid .f.hsb .f.corner -sticky news
 # Todo: What does unit mean in the context of scroll event?
 #bind $GUI::cnvs "<Command-Key-minus>" { GUI::zoomOut %W}
 #bind $GUI::cnvs "<Command-Key-plus>" { GUI::zoomIn %W}
-bind $GUI::cnvs <Configure> {GUI::calcCnvsDimensions %W}
-bind $GUI::cnvs <1> {GUI::selectObj %W %x %y}
+bind $GUI::cnvs <Configure> {GUI::calcCnvsDims %W}
+#bind $GUI::cnvs <1> {GUI::selectObj %W %x %y}
+bind $GUI::cnvs <ButtonPress-1> {GUI::startDnD %W %x %y}
+bind $GUI::cnvs <ButtonRelease-1> {GUI::endDnD %W %x %y}
+bind $GUI::cnvs <B1-Motion> {GUI::DnD %W %x %y}
 bind $GUI::cnvs <Double-1> {GUI::filterConns %W %x %y}
 bind $GUI::cnvs "<Key Z>" { GUI::zoomOut %W}
 bind $GUI::cnvs "<Key z>" { GUI::zoomIn %W}

@@ -19,7 +19,7 @@ source [file join [file dirname [info script]] lookfeel.tcl]
 dbg::initFns
 # Next line sets the list of funcs to be debugged. Should be an empty list
 #	eventually
-dbg::debugFns [list]
+dbg::debugFns [list getChipX getChipY assignInstToRgn clearSelection findObj findInst killSplash startDnD endDnD DnD drawSchematic calcCnvsDims]
 dbg::enterFn main
 
 set nl::chipWidth 40000
@@ -67,4 +67,5 @@ GUI::assignInstToRgn inst4 rgn2 17500 8000
 # Todo: I can't dismiss the messagebox below, why?
 #GUI::error "error"
 
-
+#GUI::clearDesign
+#GUI::loadDesign shiftreg.tcl

@@ -315,5 +315,13 @@ namespace eval nl {
 		dbg::msg "$rgnName: [dict get $nl::rgns $rgnName]"
 		dbg::exitFn $prevFn
 	}
+
+	proc setChipWidth {w} {
+		set nl::chipWidth $w
+	}
+
+	proc setChipHeight {h} {
+		set nl::chipHeight $h
+	}
 }
 
