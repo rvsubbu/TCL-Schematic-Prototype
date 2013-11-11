@@ -1,0 +1,20 @@
+GUI: add a popup menu
+GUI: Record/Replay
+Inst: descend into an inst
+Inst: display pin names
+Misc: FFT
+Misc: Graph
+Misc: Mandelbrot
+Misc: Pie
+Misc: add mux FF and or
+Rgn: Drag and drop of insts to regions
+Rgn: descend into a region
+Rgn: region analysis (how many nets go out of a region? how many nets between rgn1 & rgn2?)
+Rgn: regionInfo functionality
+Rgn: tooltip for region (show number of assigned insts/internal nets/ports)
+Rgn: Rest of the Chip region
+Test: adder design
+Test: random design
+Test: regularly laid out design
+Demo: Work out a script
+

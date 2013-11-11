@@ -1,0 +1,42 @@
+Code: comments
+Code: debug
+Design: clear design
+Design: designInfo command
+Design: load design
+Design: loadDesign file command
+Design: save design
+Design: saveDesign file command
+Design: tooltip
+Doc: Documentation
+Draw: Don't draw chip if nlChipWidth is 0
+Draw: Resolve EDA flylines
+Draw: round off pixels
+Events: Reset focus to cnvs after executing a command
+Events: bindings for up/down/left/right keys to scroll
+GUI: add a menu
+GUI: status window
+Inst: Double Click to show conns
+Inst: Single Click to select an inst
+Inst: descend into an inst
+Inst: display pin names
+Inst: display pins only if possible
+Inst: instInfo command
+Inst: selectInst inst command
+Inst: showInstConnections inst
+Inst: tooltip
+Inst: unselectInst command
+Net: netInfo functionality
+Net: selectNet command
+Net: selectNet functionality
+Net: showNetConnections inst
+Net: tooltip for net (show start:fanouts)
+Net: unselectNet command
+Net: unselectNet functionality
+Rgn: assignInstToRegion command
+Rgn: assignInstToRegion functionality
+Rgn: selectRegion command
+Rgn: selectRegion functionality
+Rgn: showRegionConnections inst
+Rgn: unselectRegion command
+Rgn: unselectRegion functionality
+
