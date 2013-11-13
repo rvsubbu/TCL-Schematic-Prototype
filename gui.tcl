@@ -218,14 +218,21 @@ namespace eval GUI {
 		# Draw the schematic
 		# Set the scroll parameters
 		set prevFn [dbg::enterFn drawSchematic]
+		if {! $GUI::splashOver} {
+			return
+		}
 		$GUI::cnvs delete all
 		if {(0 >= $nl::chipWidth)} {
 			#Design has been cleared
 		} else {
 			GUI::drawChip
+			dbg::msg "drew chip"
 			GUI::drawRgns
+			dbg::msg "drew rgns"
 			GUI::drawInsts
+			dbg::msg "drew insts"
 			GUI::drawNets
+			dbg::msg "drew nets"
 			set first [expr (1.0*$GUI::vpX)/$nl::chipWidth]
 			set last [expr (1.0*($GUI::vpX+$GUI::vpWidth))/$nl::chipWidth]
 			dbg::msg "vpX vpWidth chipWidth first last $GUI::vpX $GUI::vpWidth $nl::chipWidth $first $last"
@@ -239,6 +246,7 @@ namespace eval GUI {
 			dbg::msg "h nowat [$GUI::cnvs xview] v nowat [$GUI::cnvs yview]"
 			#$GUI::cnvs raise text
 		}
+		update idletasks
 		dbg::exitFn $prevFn
 	}
 
@@ -295,6 +303,7 @@ namespace eval GUI {
 		dbg::msg "$x0 $y0 $w $h"
 		set item [$GUI::cnvs create rectangle $x0 $y0 $w $h -outline red -width 3]
 		set tooltipText "Design Info\n# of Insts: $nl::instId\n# of Regions: $nl::rgnId\n# of Nets: $nl::netId"
+		update idletasks
 		tooltip::tooltip $GUI::cnvs -item $item $tooltipText
 		dbg::exitFn $prevFn
 	}
@@ -436,12 +445,12 @@ namespace eval GUI {
 			}
 		}
 #tooltip
-		set tooltipText "$inst\nInputs:$ins\nOutputs:$outs"
-		set rgn [dict get $val region]
-		if { "" != $rgn } {
-			set tooltipText "$tooltipText\nAssigned to: $rgn"
-		}
-		tooltip::tooltip $GUI::cnvs -item $item $tooltipText
+		#set tooltipText "$inst\nInputs:$ins\nOutputs:$outs"
+		#set rgn [dict get $val region]
+		#if { "" != $rgn } {
+		#	set tooltipText "$tooltipText\nAssigned to: $rgn"
+		#}
+		#tooltip::tooltip $GUI::cnvs -item $item $tooltipText
 		dbg::exitFn $prevFn
 	}
 
@@ -563,8 +572,8 @@ namespace eval GUI {
 		}
 		set item [$GUI::cnvs create line $netCoords -fill $color -width $lw -tag net -tag net$netName]
 #tooltip
-		set tooltipText "net $netName\nfrom: $fromInstName.$fromPin\nto: $toInstName.$toPin"
-		tooltip::tooltip $GUI::cnvs -item $item $tooltipText
+		#set tooltipText "net $netName\nfrom: $fromInstName.$fromPin\nto: $toInstName.$toPin"
+		#tooltip::tooltip $GUI::cnvs -item $item $tooltipText
 		dbg::exitFn $prevFn
 	}
 
@@ -1070,6 +1079,7 @@ namespace eval GUI {
 			if { "" != $GUI::dndInstName } {
 				# We are set for Drag and Drop
 				$w raise $GUI::dndInstName
+				update idletasks
 				#$w itemconfigure $GUI::dndInstName -outline red
 			}
 		} else {
@@ -1083,6 +1093,7 @@ namespace eval GUI {
 		dbg::msg "w is $w x is $x y is $y dndInstName is $GUI::dndInstName"
 		if { "" != $GUI::dndInstName } {
 			$w move $GUI::dndInstName [expr $x-$GUI::dndOldX] [expr $y-$GUI::dndOldY]
+			update idletasks
 			set GUI::dndOldX $x
 			set GUI::dndOldY $y
 		}

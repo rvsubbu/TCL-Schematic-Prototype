@@ -24,10 +24,18 @@ GUI commands:
 	unselectInst
 	instInfo instName
 	showInstConnections
-	selectRegion rgnName (Not yet implemented)
-	unselectRegion (Not yet implemented)
-	regionInfo rgnName (Not yet implemented)
-	selectNet netName (Not yet implemented)
-	unselectNet (Not yet implemented)
-	netInfo (Not yet implemented)
+	selectRegion rgnName
+	unselectRegion
+	regionInfo rgnName
+	selectNet netName
+	unselectNet
+	netInfo
+	setPinDisplay
+	goIntoRegion
+	nlSetChipWidth
+	nlSetChipHeight
+	regionFlylines
+	assignInstToRegion
+	showRegionConnections
+	showNetConnections
 
