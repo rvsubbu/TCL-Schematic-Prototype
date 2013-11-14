@@ -1,0 +1,92 @@
+Self Intro
+	EDA veteran - FrontLine, Synplicity
+					Simulation, Synthesis, Floorplanning, FPGA
+	GUI veteran - vt220 terminal. X Windows Microsoft Windows, MFC
+	Software veteran - C/C++ Data Structures, Algorithms
+	Fast learner - production level quality code in almost all scripting languages
+					Web/javascript, phonegap, mobile etc.
+
+	TCL - used TCL as the usual EDA glue language
+	TK - no real experience, helloworld level
+
+Prototype:
+	Vineet's call
+	First iteration of requirements understanding - TK internals
+	Second iteration - TK for EDA
+	TCL-Schematic-Prototype
+	Prototype for Synopsys TCL/TK GUI Position
+	Schematic viewer for Vineet Rashingkar
+	version 0.2
+	RV
+	Start Date: Nov4, 2013
+	Deadline: Nov7, 2013
+	Actual Finish: Nov8, 2013
+	Language: TCL/TK
+
+	What does the prototype do:
+		Create netlist - insts, nets and regions using newly defined TCL "commands"
+		Advantage - just use tcl syntax without having to learn a complete new language (some new commands)
+
+		All insts have geometry (x,y,wid,hei)
+		Specify numIns and numOuts
+		Displayed as rects
+		
+		Nets have a from and to.
+		nets shown as flylines
+
+		regions have a geometry
+		Displayed as dotted rects
+
+		General philosophy: Everything can be executed as a command. Some of
+		the commands have a menu option, a key binding etc.
+
+		Assign inst to region
+
+Netlist commands:
+	nlInst name <-type type> <-numInputs numInputs> <-numOutputs numOutputs> <-parent parentInst> <-x x> <-y y> <-width width> <-height height> <-region region>
+	nlNet <-name name> -from fromPort -to toPort
+	nlRegion <-x x> <-y y> <-width width> <-height height>
+
+GUI commands:
+	loadDesign fileName
+	saveDesign fileName
+	clearDesign
+	designInfo
+	selectInst instName
+	unselectInst
+	instInfo instName
+	showInstConnections
+	selectRegion rgnName
+	unselectRegion
+	regionInfo rgnName
+	selectNet netName
+	unselectNet
+	netInfo
+	setPinDisplay
+	goIntoRegion
+	nlSetChipWidth
+	nlSetChipHeight
+	regionFlylines
+	assignInstToRegion
+	showRegionConnections
+	showNetConnections
+
+This is just a prototype
+	Lots of pending issues to be addressed
+	Testing (laptop issue)
+	Tooltip bug
+	More realistic pictures (mux, FF, gates etc.)
+	region analysis
+		how many nets go out of a region? how many nets between rgn1 & rgn2?
+	Define rest of the chip as a region
+	descend into an inst
+	display pin names
+	popup menu for rgn/inst/nets
+	Dialog to set parameters like net color, inst color, and so on
+	Not much error checking
+	No performance profiling (laptop issue, some flashing)
+
+BWidget
+Don't use BLT
+itcl
+
