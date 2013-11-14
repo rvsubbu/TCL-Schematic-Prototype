@@ -17,9 +17,9 @@ source [file join [file dirname [info script]] nl.tcl]
 source [file join [file dirname [info script]] lookfeel.tcl]
 
 # Sets the list of funcs to be debugged. Should be an empty list some day
-dbg::debugFns [list]
+dbg::setStepFuncs [list nl::makeNet]
+dbg::setVerboseFuncs [list main nl::makeNet]
 
-trace add execution GUI::calcCnvsDims enter enterTrace
 
 #source [file join [file dirname [info script]] defaultdesign.tcl]
 #source [file join [file dirname [info script]] random.tcl]
