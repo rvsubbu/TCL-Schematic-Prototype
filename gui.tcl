@@ -94,8 +94,8 @@ namespace eval GUI {
 	interp alias slave netInfo {} GUI::netInfo
 	interp alias slave showNetConnections {} GUI::showNetConns
 
+
 	proc calcCnvsDims {w} {
-		set prevFn [dbg::enterFn calcCnvsDims]
 		set GUI::cnvsWidth [winfo width $w]
 		set GUI::cnvsHeight [winfo height $w]
 		dbg::msg "$w $GUI::cnvsWidth, $GUI::cnvsHeight"
@@ -116,11 +116,9 @@ namespace eval GUI {
 		} else {
 			GUI::splashScreen
 		}
-		dbg::exitFn $prevFn
 	}
 
 	proc splashScreen {} {
-		set prevFn [dbg::enterFn splashScreen]
 		$GUI::cnvs delete all
 		set xcen [expr $GUI::cnvsWidth / 2]
 		dbg::msg "wid is $GUI::cnvsWidth xcen is $xcen"
@@ -131,24 +129,20 @@ namespace eval GUI {
 		$GUI::cnvs create image [expr $xcen + 125] 250 -image $GUI::RV -tag foo
 		$GUI::cnvs create text $xcen 400 -text "Click to continue" -tag foo
 		set GUI::status "Click to continue"
-		dbg::exitFn $prevFn
 	}
 
 	proc setDefaultViewport {} {
-		set prevFn [dbg::enterFn setDefaultViewport]
 		set GUI::vpX 0
 		set GUI::vpY 0
 		set GUI::vpWidth $nl::chipWidth
 		set GUI::vpHeight $nl::chipHeight
 		set GUI::vpMinWidth [expr $GUI::vpWidth / 16 ]
 		set GUI::vpMinHeight [expr $GUI::vpHeight / 16 ]
-		dbg::exitFn $prevFn
 	}
 
 	proc zoomOut {w} {
 		# zoomOut doubles the Viewport in both x & y directions
 		# Currently we cannot zoom out beyond the size of the chip
-		set prevFn [dbg::enterFn zoomOut]
 		dbg::msg "$w x,y,wid,hei $GUI::vpX $GUI::vpY $GUI::vpWidth $GUI::vpHeight"
 		if {-1 == $GUI::vpWidth} {
 			GUI::setDefaultViewport
@@ -173,14 +167,12 @@ namespace eval GUI {
 		}
 		GUI::drawSchematic
 		dbg::msg "x,y,wid,hei $GUI::vpX $GUI::vpY $GUI::vpWidth $GUI::vpHeight"
-		dbg::exitFn $prevFn
 	}
 
 	proc zoomIn {w} {
 		# zoomIn halves the Viewport in both x & y directions
 		# Currently we cannot zoom in beyond 1/16th of the chip
 		# Todo: Make this 1/16th a configurable parameter
-		set prevFn [dbg::enterFn zoomIn]
 		dbg::msg "$w x,y,wid,hei $GUI::vpX $GUI::vpY $GUI::vpWidth $GUI::vpHeight"
 		if {-1 == $GUI::vpWidth} {
 			GUI::setDefaultViewport
@@ -196,11 +188,9 @@ namespace eval GUI {
 			set GUI::status "Cannot zoom in any more"
 		dbg::msg "x,y,wid,hei $GUI::vpX $GUI::vpY $GUI::vpWidth $GUI::vpHeight"
 		}
-		dbg::exitFn $prevFn
 	}
 
 	proc showInfo {} {
-		set prevFn [dbg::enterFn showInfo]
 		if { "" != $GUI::selectedInst } {
 			instInfo $GUI::selectedInst
 		}
@@ -211,13 +201,11 @@ namespace eval GUI {
 			netInfo $GUI::selectedNet
 		}
 		designInfo
-		dbg::exitFn $prevFn
 	}
 
 	proc drawSchematic {} {
 		# Draw the schematic
 		# Set the scroll parameters
-		set prevFn [dbg::enterFn drawSchematic]
 		$GUI::cnvs delete all
 		if {(0 >= $nl::chipWidth)} {
 			#Design has been cleared
@@ -239,55 +227,45 @@ namespace eval GUI {
 			dbg::msg "h nowat [$GUI::cnvs xview] v nowat [$GUI::cnvs yview]"
 			#$GUI::cnvs raise text
 		}
-		dbg::exitFn $prevFn
 	}
 
 	proc getX {x} {
 		# X Transformation - we use 80% horizontal area for drawing
-		set prevFn [dbg::enterFn getX]
 		dbg::msg "$x $GUI::cnvsWidth $GUI::vpWidth $GUI::vpX $nl::chipWidth"
 		set x1 [expr (round ((0.1*$GUI::cnvsWidth) + [expr (0.8*($x-$GUI::vpX)*$GUI::cnvsWidth/$GUI::vpWidth)]))]
 		dbg::msg "in, out: $x $x1"
-		dbg::exitFn $prevFn
 		return $x1
 	}
 
 	proc getY {y} {
 		# Y Transformation - We use 80% vertical area for drawing.
-		set prevFn [dbg::enterFn getY]
 		# UI y starts at top, chip y starts at bottom.
 		dbg::msg "$y $GUI::cnvsHeight $nl::chipHeight"
 		set y1 [expr (round ((0.9*$GUI::cnvsHeight) - [expr (0.8*($y-$GUI::vpY)*$GUI::cnvsHeight/$GUI::vpHeight)]))]
 		dbg::msg "in, out: $y $y1"
-		dbg::exitFn $prevFn
 		return $y1
 	}
 
 	proc getChipX {x} {
 		# Reverse of getX
-		set prevFn [dbg::enterFn getChipX]
 		dbg::msg "$x $GUI::cnvsWidth $GUI::vpWidth $GUI::vpX $nl::chipWidth"
 		set x1 [expr $GUI::vpX + (1.25* $GUI::vpWidth * ($x- (0.1*$GUI::cnvsWidth)) / $GUI::cnvsWidth)]
 		dbg::msg "in, out: $x $x1"
-		dbg::exitFn $prevFn
 		return $x1
 	}
 
 	proc getChipY {y} {
 		# Reverse of getY
-		set prevFn [dbg::enterFn getChipY]
 		# UI y starts at top, chip y starts at bottom.
 		dbg::msg "$y $GUI::cnvsHeight $nl::chipHeight"
 		set y1 [expr $GUI::vpY + (1.25 * $GUI::vpHeight * ((0.9 * $GUI::cnvsHeight) - $y) / $GUI::cnvsHeight)]
 		dbg::msg "in, out: $y $y1"
-		dbg::exitFn $prevFn
 		return $y1
 	}
 
 	proc drawChip {} {
 		# Draw the chip outline
 		# Todo: Not sure whether we should do this
-		set prevFn [dbg::enterFn drawChip]
 		set w [GUI::getX $nl::chipWidth]
 		set h [GUI::getY $nl::chipHeight]
 		set x0 [GUI::getX 0]
@@ -296,12 +274,10 @@ namespace eval GUI {
 		set item [$GUI::cnvs create rectangle $x0 $y0 $w $h -outline red -width 3]
 		set tooltipText "Design Info\n# of Insts: $nl::instId\n# of Regions: $nl::rgnId\n# of Nets: $nl::netId"
 		tooltip::tooltip $GUI::cnvs -item $item $tooltipText
-		dbg::exitFn $prevFn
 	}
 
 	proc drawRgns {} {
 		# Draw all regions
-		set prevFn [dbg::enterFn drawRgns]
 		dbg::msg "winWid,Hei are $GUI::cnvsWidth, $GUI::cnvsHeight"
 		foreach rgn [dict keys $nl::rgns] {
 			set val [dict get $nl::rgns $rgn]
@@ -345,14 +321,12 @@ namespace eval GUI {
 			dbg::msg "$xstr $ystr box is $x1 $y1 $w1 $h1 txt is $rgn"
 			$GUI::cnvs create text $xstr $ystr -text $rgn -fill blue -tag rgn -tag $rgn -tag text
 		}
-		dbg::exitFn $prevFn
 	}
 
 	proc drawOneInst {inst {highlight false} } {
 		# Draw the given inst as a rect.
 		# If highlight is true (selected inst), draw it in red
 		# Store the rect for easy calculation of click to inst
-		set prevFn [dbg::enterFn drawOneInst]
 		set val [dict get $nl::insts $inst]
 		#dbg::msg "$inst is $val"
 		dbg::msg "inst is $inst"
@@ -442,11 +416,9 @@ namespace eval GUI {
 			set tooltipText "$tooltipText\nAssigned to: $rgn"
 		}
 		tooltip::tooltip $GUI::cnvs -item $item $tooltipText
-		dbg::exitFn $prevFn
 	}
 
 	proc drawOnlyInstsOfSelectedNet {} {
-		set prevFn [dbg::enterFn drawOnlyInstsOfSelectedNet]
 		# Draw only the selected net and its conn insts.
 		dbg::msg "Drawing insts of $GUI::selectedNet only"
 		set net [dict get $nl::nets $GUI::selectedNet]
@@ -456,11 +428,9 @@ namespace eval GUI {
 		GUI::drawOneInst $fromInstName
 		set toInstName [string range $to 0 [expr ([string last . $to]) - 1]]
 		GUI::drawOneInst $toInstName
-		dbg::exitFn $prevFn
 	}
 
 	proc drawOnlyInstsOfSelectedRgn {} {
-		set prevFn [dbg::enterFn drawOnlyInstsOfSelectedRgn]
 		# Draw only insts (and their connInsts) assigned to the rgn.
 		# connInsts may be outside the rgn
 		dbg::msg "Drawing insts of $GUI::selectedRgn only"
@@ -475,11 +445,9 @@ namespace eval GUI {
 				GUI::drawOneInst $connInst
 			}
 		}
-		dbg::exitFn $prevFn
 	}
 
 	proc drawOnlySelectedInst {} {
-		set prevFn [dbg::enterFn drawOnlySelectedInst]
 		# Draw only the selected inst and its conn insts.
 		dbg::msg "drawing $GUI::selectedInst only"
 		GUI::drawOneInst $GUI::selectedInst true
@@ -489,11 +457,9 @@ namespace eval GUI {
 			dbg::msg "connInst is $connInst"
 			GUI::drawOneInst $connInst
 		}
-		dbg::exitFn $prevFn
 	}
 
 	proc drawInsts {} {
-		set prevFn [dbg::enterFn drawInsts]
 		dbg::msg "mode is $GUI::mode"
 		if { 3 == $GUI::mode } {
 			drawOnlyInstsOfSelectedNet
@@ -510,11 +476,9 @@ namespace eval GUI {
 				}
 			}
 		}
-		dbg::exitFn $prevFn
 	}
 
 	proc drawNet {netName {highlight false} } {
-		set prevFn [dbg::enterFn drawNet]
 		set val [dict get $nl::nets $netName]
 		dbg::msg "net is $val"
 		set from [dict get $val from]
@@ -565,21 +529,17 @@ namespace eval GUI {
 #tooltip
 		set tooltipText "net $netName\nfrom: $fromInstName.$fromPin\nto: $toInstName.$toPin"
 		tooltip::tooltip $GUI::cnvs -item $item $tooltipText
-		dbg::exitFn $prevFn
 	}
 
 	proc drawNetsOfInst {instName} {
-		set prevFn [dbg::enterFn drawNetsOfInst]
 		set inst [dict get $nl::insts $instName]
 		set nets [dict get $inst nets]
 		foreach net [dict keys $nets] {
 			drawNet $net
 		}
-		dbg::exitFn $prevFn
 	}
 
 	proc drawOnlyNetsOfSelectedRgn {} {
-		set prevFn [dbg::enterFn drawOnlyNetsOfSelectedRgn]
 		# Draw only the nets of insts in rgn
 		dbg::msg "drawing nets of insts in rgn $GUI::selectedRgn only"
 		set rgn [dict get $nl::rgns $GUI::selectedRgn]
@@ -587,11 +547,9 @@ namespace eval GUI {
 		foreach inst [dict keys $insts] {
 			drawNetsOfInst $inst
 		}
-		dbg::exitFn $prevFn
 	}
 
 	proc drawNets {} {
-		set prevFn [dbg::enterFn drawNets]
 		if { 3 == $GUI::mode } {
 			drawNet $GUI::selectedNet true
 		} elseif { 2 == $GUI::mode } {
@@ -607,11 +565,9 @@ namespace eval GUI {
 				}
 			}
 		}
-		dbg::exitFn $prevFn
 	}
 
 	proc vertScroll {args} {
-		set prevFn [dbg::enterFn vertScroll]
 		set nowat [$GUI::cnvs yview]
 		set scrollPos [$GUI::vsb get]
 		set start [lindex $scrollPos 0]
@@ -647,11 +603,9 @@ namespace eval GUI {
 			}
 		}
 		GUI::drawSchematic
-		dbg::exitFn $prevFn
 	}
 
 	proc horizScroll {args} {
-		set prevFn [dbg::enterFn horizScroll]
 		set nowat [$GUI::cnvs xview]
 		set scrollPos [$GUI::hsb get]
 		set start [lindex $scrollPos 0]
@@ -691,11 +645,9 @@ namespace eval GUI {
 			}
 		}
 		GUI::drawSchematic
-		dbg::exitFn $prevFn
 	}
 
 	proc killSplash {w} {
-		set prevFn [dbg::enterFn killSplash]
 		dbg::msg "w is $w"
 		$w delete foo
 		if {! $GUI::splashOver} {
@@ -703,11 +655,9 @@ namespace eval GUI {
 		}
 		GUI::calcCnvsDims $w
 		set GUI::status ""
-		dbg::exitFn $prevFn
 	}
 
 	proc clearSelection {w} {
-		set prevFn [dbg::enterFn clearSelection]
 		dbg::msg "w is $w"
 		set GUI::selectedInst ""
 		set GUI::selectedRgn ""
@@ -716,13 +666,11 @@ namespace eval GUI {
 		dbg::msg "mode is normal"
 		GUI::calcCnvsDims $w
 		set GUI::status "Selection cleared"
-		dbg::exitFn $prevFn
 	}
 
 	proc findObj {x y rectDict} {
 		# See where the click falls in the rectDict and identify the obj.
 		# Maybe an inst or a rgn
-		set prevFn [dbg::enterFn findObj]
 		set ret ""
 		dbg::msg "click at $x $y"
 		foreach obj [dict keys $rectDict] {
@@ -744,38 +692,31 @@ namespace eval GUI {
 			set ret $obj
 			break
 		}
-		dbg::exitFn $prevFn
 		return $ret
 	}
 
 	proc findInst {x y} {
 		# See where the click falls among instRects and identify the inst.
-		set prevFn [dbg::enterFn findInst]
 		set ret [findObj $x $y $GUI::instRects]
 		if { "" == $ret } {
 			dbg::msg "no inst at click"
 		}
-		dbg::exitFn $prevFn
 		return $ret
 	}
 
 	proc findRgn {x y} {
 		# See where the click falls among rgnRects and identify the rgn.
-		set prevFn [dbg::enterFn findRgn]
 		set ret [findObj $x $y $GUI::rgnRects]
 		if { "" == $ret } {
 			dbg::msg "no rgn at click"
 		}
-		dbg::exitFn $prevFn
 		return $ret
 	}
 
 	proc selectObj {w x y} {
-		set prevFn [dbg::enterFn selectObj]
 		focus $w
 		if {! $GUI::splashOver} {
 			killSplash $w
-			dbg::exitFn $prevFn
 			return
 		}
 		dbg::msg "w x y are $w $x $y"
@@ -802,41 +743,33 @@ namespace eval GUI {
 			dbg::msg "inst/rgn is $obj mode is $GUI::mode"
 			set GUI::status "Selected object (instance/region): $obj"
 		}
-		dbg::exitFn $prevFn
 	}
 
 	proc showNetConns {netName} {
-		set prevFn [dbg::enterFn showNetConns]
 		set GUI::selectedNet $netName
 		set GUI::mode 3
 		dbg::msg "mode is netConn, net is $netName"
 		GUI::drawSchematic
 		set GUI::status "Showing connections for net $netName"
-		dbg::exitFn $prevFn
 	}
 
 	proc showRgnConns {rgnName} {
-		set prevFn [dbg::enterFn showRgnConns]
 		set GUI::selectedRgn $rgnName
 		set GUI::mode 2
 		dbg::msg "mode is rgnConn, net is $rgnName"
 		GUI::drawSchematic
 		set GUI::status "Showing connections for region $rgnName"
-		dbg::exitFn $prevFn
 	}
 
 	proc showInstConns {instName} {
-		set prevFn [dbg::enterFn showInstConns]
 		set GUI::selectedInst $instName
 		set GUI::mode 1
 		dbg::msg "mode is instConn, inst is $instName"
 		GUI::drawSchematic
 		set GUI::status "Showing connections for instance $instName"
-		dbg::exitFn $prevFn
 	}
 
 	proc filterConns {w x y} {
-		set prevFn [dbg::enterFn filterConns]
 		dbg::msg "w x y are $w $x $y"
 		set dnd [ $GUI::cnvs find closest $x $y ]
 		dbg::msg "dnd is $dnd"
@@ -857,89 +790,66 @@ namespace eval GUI {
 				dbg::msg "mode is normal"
 			}
 		}
-		dbg::exitFn $prevFn
 	}
 
 	proc showAbout {} {
-		set prevFn [dbg::enterFn showAbout]
 		tk_messageBox -message "Prototype for Vineet Rashingkar\nVersion: 0.1\nAuthor: RV" -title "About SynProto"
-		dbg::exitFn $prevFn
 	}
 
 	proc loadDesign {file} {
-		set prevFn [dbg::enterFn loadDesign]
 		nl::loadDesign $file
 		GUI::drawSchematic
 		set GUI::status "Loaded script $file"
-		dbg::exitFn $prevFn
 	}
 
 	proc openDesign {} {
-		set prevFn [dbg::enterFn openDesign]
 		set types {
 			{{TCL Scripts} {.tcl}}
 			{{All Files} *}
 		}
 		set response [tk_getOpenFile -filetypes $types]
 		GUI::loadDesign $response
-		dbg::exitFn $prevFn
 	}
 
 	proc saveDesign {} {
-		set prevFn [dbg::enterFn saveDesign]
 		set response [tk_getSaveFile -title Save -defaultextension tcl -parent .]
 		if { "" == $response } {
-			dbg::exitFn $prevFn
 			return; # Cancel was clicked.
 		}
 		nl::saveDesign $response
-		dbg::exitFn $prevFn
 	}
 
 	proc clearDesign {} {
-		set prevFn [dbg::enterFn clearDesign]
 		nl::clearDesign
 		GUI::drawSchematic
-		dbg::exitFn $prevFn
 	}
 
 	proc execCmd {} {
-		set prevFn [dbg::enterFn execCmd]
 		dbg::msg "command is $GUI::cmd"
 		$GUI::slave eval $GUI::cmd
-		dbg::exitFn $prevFn
 	}
 
 	proc setSelectInst {name} {
-		set prevFn [dbg::enterFn setSelectInst]
 		set GUI::selectedInst $name
 		GUI::drawSchematic
-		dbg::exitFn $prevFn
 	}
 
 	proc setSelectRgn {name} {
-		set prevFn [dbg::enterFn setSeletRgn]
 		set GUI::selectedRgn $name
 		GUI::drawSchematic
-		dbg::exitFn $prevFn
 	}
 
 	proc setSelectNet {name} {
-		set prevFn [dbg::enterFn setSelectNet]
 		set GUI::selectedNet $name
 		GUI::drawSchematic
-		dbg::exitFn $prevFn
 	}
 
 	proc designInfo {} {
-		set prevFn [dbg::enterFn designInfo]
 		set info "# of Insts: $nl::instId\n# of Regions: $nl::rgnId\n# of Nets: $nl::netId"
 		tk_messageBox -message $info -title "Design Info"
-		dbg::exitFn $prevFn
 	}
 
 	proc instInfo {inst} {
-		set prevFn [dbg::enterFn instInfo]
 		set val [dict get $nl::insts $inst]
 		set ins [dict get $val numInputs]
 		set outs [dict get $val numOutputs]
@@ -950,11 +860,9 @@ namespace eval GUI {
 			set info "$inst\nInputs: $ins\nOutputs: $outs\nRegion assignment: $rgn"
 		}
 		tk_messageBox -message $info -title "Instance Info"
-		dbg::exitFn $prevFn
 	}
 
 	proc rgnInfo {rgn} {
-		set prevFn [dbg::enterFn rgnInfo]
 		set val [dict get $nl::rgns $rgn]
 		set insts [dict get $val insts]
 		set info ""
@@ -966,11 +874,9 @@ namespace eval GUI {
 		}
 		set title "$rgn Info"
 		tk_messageBox -message $info -title -title
-		dbg::exitFn $prevFn
 	}
 
 	proc netInfo {net} {
-		set prevFn [dbg::enterFn netInfo]
 		set info ""
 		set val [dict get $nl::nets $net]
 		set name [dict get $val name]
@@ -997,51 +903,39 @@ namespace eval GUI {
 			set info "$info to chip"
 		}
 		tk_messageBox -message $info -title "Net Info"
-		dbg::exitFn $prevFn
 	}
 
 	proc unselectInst {} {
-		set prevFn [dbg::enterFn unselectInst]
 		set GUI::selectedInst ""
 		set GUI::mode 0
 		GUI::drawSchematic
-		dbg::exitFn $prevFn
 	}
 
 	proc unselectRgn {} {
-		set prevFn [dbg::enterFn unselectRgn]
 		set GUI::selectedRgn ""
 		set GUI::mode 0
 		GUI::drawSchematic
-		dbg::exitFn $prevFn
 	}
 
 	proc unselectNet {} {
-		set prevFn [dbg::enterFn unselectNet]
 		set GUI::selectedNet ""
 		set GUI::mode 0
 		GUI::drawSchematic
-		dbg::exitFn $prevFn
 	}
 
 	proc assignInstToRgn {inst rgn x y {considerGeometry true} } {
-		set prevFn [dbg::enterFn assignInstToRgn]
 		dbg::msg "GUI assignInst - $inst $rgn $x $y"
 		nl::assignInstToRgn $inst $rgn $x $y $considerGeometry
 		GUI::drawSchematic
-		dbg::exitFn $prevFn
 	}
 
 	proc error {msg} {
-		set prevFn [dbg::enterFn error]
 		bell
 		set GUI::status $msg
 		tk_messageBox -message $msg -title "Error"
-		dbg::exitFn $prevFn
 	}
 
 	proc pickInstForDnD { x y } {
-		set prevFn [dbg::enterFn pickInstForDnD]
 		global oldx oldy
 		$GUI::cnvs raise current
 		dbg::msg "x is $x y is $y"
@@ -1055,11 +949,9 @@ namespace eval GUI {
 		set canvas($can,obj) [ $can find closest $x $y ]
 		set canvas($can,x) $x
 		set canvas($can,y) $y
-		dbg::exitFn $prevFn
 	}
 
 	proc startDnD { w x y } {
-		set prevFn [dbg::enterFn startDnD]
 		dbg::msg "w is $w x is $x y is $y"
 		if {$GUI::splashOver} {
 			set GUI::dndOldX $x
@@ -1075,22 +967,18 @@ namespace eval GUI {
 		} else {
 			GUI::killSplash $w
 		}
-		dbg::exitFn $prevFn
 	}
 
 	proc DnD { w x y } {
-		set prevFn [dbg::enterFn DnD]
 		dbg::msg "w is $w x is $x y is $y dndInstName is $GUI::dndInstName"
 		if { "" != $GUI::dndInstName } {
 			$w move $GUI::dndInstName [expr $x-$GUI::dndOldX] [expr $y-$GUI::dndOldY]
 			set GUI::dndOldX $x
 			set GUI::dndOldY $y
 		}
-		dbg::exitFn $prevFn
 	}
 
 	proc endDnD { w x y } {
-		set prevFn [dbg::enterFn endDnD]
 		dbg::msg "w is $w x is $x y is $y dndInstName is $GUI::dndInstName"
 		if { "" != $GUI::dndInstName } {
 			#$w itemconfigure $GUI::dndInstName -outline darkgreen
@@ -1121,11 +1009,9 @@ namespace eval GUI {
 			}
 		}
 		GUI::selectObj $w $x $y
-		dbg::exitFn $prevFn
 	}
 
 	proc drawFF {x y} {
-		set prevFn [dbg::enterFn drawFF]
 		set ffWidth 75
 		set ffHeight 100
 		set ffOffset 5
@@ -1151,22 +1037,18 @@ namespace eval GUI {
 		$GUI::cnvs create text $lx2 $ly1 -text "Q" -tag ff
 		$GUI::cnvs create text $lx2 $ly2 -text "Q'" -tag ff
 
-		dbg::exitFn $prevFn
 	}
 
 	proc drawPort {portName} {
 	}
 
 	proc setPinDisplay {v} {
-		set prevFn [dbg::enterFn setPinDisplay]
 		set GUI::pinDisplay $v
 		dbg::msg "v is $v pindisplay is $GUI::pinDisplay"
 		GUI::drawSchematic
-		dbg::exitFn $prevFn
 	}
 
 	proc goIntoRgn {rgnName} {
-		set prevFn [dbg::enterFn goIntoRgn]
 		set rgn [dict get $nl::rgns $rgnName]
 		set GUI::vpX [dict get $rgn x]
 		set GUI::vpY [dict get $rgn y]
@@ -1175,11 +1057,9 @@ namespace eval GUI {
 		set GUI::vpMinWidth [expr $GUI::vpWidth / 16 ]
 		set GUI::vpMinHeight [expr $GUI::vpHeight / 16 ]
 		GUI::drawSchematic
-		dbg::exitFn $prevFn
 	}
 
 	proc rgnFlylines {rgnName} {
-		set prevFn [dbg::enterFn rgnFlylines]
 		if {! [dict exists $GUI::rgnRects $rgnName] } {
 			return
 		}
@@ -1206,7 +1086,6 @@ namespace eval GUI {
 		set ystr [expr ($y1 + $y2) /2]
 		dbg::msg "$xstr $ystr box is $x1 $y1 $x2 $y2 txt is $rgnName"
 		$GUI::cnvs create text $xstr $ystr -text $rgnName -fill blue -tag rgn -tag rgnflyline -tag $rgnName -tag text
-		dbg::exitFn $prevFn
 	}
 }
 

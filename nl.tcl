@@ -19,7 +19,6 @@ namespace eval nl {
 
 	proc makeInst {name args} {
 		# syntax: nlInst name <-type type> <-numInputs numInputs> <-numOutputs numOutputs> <-parent parentInst> <-x x> <-y y> <-width width> <-height height> <-region region>
-		set prevFn [dbg::enterFn makeInst]
 		set id $nl::instId
 		incr nl::instId
 	
@@ -66,13 +65,11 @@ namespace eval nl {
 			set nl::chipHeight [expr 1.25 * $yMax]
 		}
 		set GUI::status "Created instance $name"
-		dbg::exitFn $prevFn
 	}
 	
 	proc makeNet {args} {
 		# syntax: nlNet <-name name> -from fromPort -to toPort
 		# Todo: multi-fanout nets
-		set prevFn [dbg::enterFn makeNet]
 		set id $nl::netId
 		incr nl::netId
 	
@@ -128,12 +125,10 @@ namespace eval nl {
 			dbg::msg "fromInst is [dict get $nl::insts $fromInstName]"
 		}
 		set GUI::status "Created net $name"
-		dbg::exitFn $prevFn
 	}
 	
 	proc makeRgn {name args} {
 		# syntax: nlRegion <-x x> <-y y> <-width width> <-height height>
-		set prevFn [dbg::enterFn makeRgn]
 		set id $nl::rgnId
 		incr nl::rgnId
 	
@@ -168,12 +163,10 @@ namespace eval nl {
 			set nl::chipHeight [expr 1.25 * $yMax]
 		}
 		set GUI::status "Created region $name"
-		dbg::exitFn $prevFn
 	}
 	
 	proc saveDesign {fileName} {
 		# Save the design as nlInst, nlNet, nlRegion commands
-		set prevFn [dbg::enterFn saveDesign]
 		set fp [open $fileName w]
 		foreach item [dict keys $nl::insts] {
 			set val [dict get $nl::insts $item]
@@ -216,11 +209,9 @@ namespace eval nl {
 			puts $fp $str
 		}
 		close $fp
-		dbg::exitFn $prevFn
 	}
 	
 	proc loadDesign {fileName} {
-		set prevFn [dbg::enterFn loadDesign]
 		set fp [open $fileName r]
 		set design [read $fp]
 		set data [split $design "\n"]
@@ -228,12 +219,10 @@ namespace eval nl {
 			$GUI::slave eval $line
 		}
 		close $fp
-		dbg::exitFn $prevFn
 	}
 	
 	proc clearDesign {} {
 		# Delete all insts, nets and rgns
-		set prevFn [dbg::enterFn clearDesign]
 		foreach item [dict keys $nl::insts] {
 			dict unset nl::insts $item
 		}
@@ -248,26 +237,22 @@ namespace eval nl {
 		dbg::msg "rgns: $nl::rgns"
 		set nl::chipWidth -1
 		set nl::chipHeight -1
-		dbg::exitFn $prevFn
 	}
 
 	proc assignInstToRgn {instName rgnName x y {considerGeometry true}} {
 		# Move the inst to the location (x,y). (x,y) must be within the rgn
 		# if considerGeometry is false, just make the assignment and don't
 		#	worry about geometry
-		set prevFn [dbg::enterFn assignInstToRgn]
 		dbg::msg "inst is $instName rgn is $rgnName x is $x y is $y"
 
 		if {! [dict exists $nl::insts $instName] } {
 			GUI::error "No such inst as $instName"
-			dbg::exitFn $prevFn
 			return
 		}
 		set inst [dict get $nl::insts $instName]
 
 		if {! [dict exists $nl::rgns $rgnName] } {
 			GUI::error "No such inst as $rgnName"
-			dbg::exitFn $prevFn
 			return
 		}
 		set rgn [dict get $nl::rgns $rgnName]
@@ -301,7 +286,6 @@ namespace eval nl {
 			}
 			if { $geometryError } {
 				GUI::error "inst $instName is going out of the region $rgnName, cannot make the assignment\nRegion box is $rgnX1 $rgnY1 $rgnX2 $rgnY1\nRequested inst box is $x $y $x2 $y2"
-				dbg::exitFn $prevFn
 				return
 			}
 		}
@@ -313,7 +297,6 @@ namespace eval nl {
 		#dbg::msg "$instName: [dict get $nl::insts $instName]"
 		dict set nl::rgns $rgnName insts $instName true
 		#dbg::msg "$rgnName: [dict get $nl::rgns $rgnName]"
-		dbg::exitFn $prevFn
 	}
 
 	proc setChipWidth {w} {

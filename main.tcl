@@ -16,12 +16,10 @@ source [file join [file dirname [info script]] gui.tcl]
 source [file join [file dirname [info script]] nl.tcl]
 source [file join [file dirname [info script]] lookfeel.tcl]
 
-dbg::initFns
-# Next line sets the list of funcs to be debugged. Should be an empty list
-#	eventually
+# Sets the list of funcs to be debugged. Should be an empty list some day
 dbg::debugFns [list]
-dbg::enterFn main
 
+trace add execution GUI::calcCnvsDims enter enterTrace
 
 #source [file join [file dirname [info script]] defaultdesign.tcl]
 #source [file join [file dirname [info script]] random.tcl]
