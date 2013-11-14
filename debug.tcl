@@ -22,14 +22,15 @@
 #	A much simpler rewrite using existing TCL data structs to print call
 #	stack etc.
 #	Namespace bug mentioned above is automatically fixed.
-#		Add a simplistic watch mechanism (display values @ every func entry)
+#	Todos:
+#		Add at least a simplistic watch mechanism (display values @ every
+#			func entry, preferably for every step in stepFuncs)
+#		Add a way to step out of the currFunc
 
 
 namespace eval dbg {
-	array set verboseFuncs {}; # funcs whose puts msgs will be printed out
-	array set setFuncs {}; # funcs to be stepped through
-	set verboseFuncs(main) false
-	set stepFuncs(main) false
+	set verboseFuncs(main) false; # array of funcs whose puts msgs will be printed out
+	set stepFuncs(main) false; # array of funcs to be stepped through
 
 	proc getCallStack {} {
 		set stack "Stack trace:\n"
@@ -57,6 +58,7 @@ namespace eval dbg {
 
 	proc interact args {
 		if {[lindex $args end] eq "leavestep"} {
+			puts "interact leavestep - args are $args"
 			puts ==>[lindex $args 2]
 			return
 		}
@@ -65,9 +67,10 @@ namespace eval dbg {
 			puts -nonewline "> "
 			flush stdout
 			gets stdin cmd
+			puts "cmd is $cmd"
 			if {$cmd eq "c" || $cmd eq ""} break
 			catch {uplevel 1 $cmd} res
-			if {[string length $res]} {puts $res}
+			if {[string length $res]} {puts "res is $res"}
 		}
 	}
 	proc printArgsOnEntry {args} {
