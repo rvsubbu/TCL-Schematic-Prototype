@@ -25,6 +25,7 @@
 #	Todos:
 #		Add at least a simplistic watch mechanism (display values @ every
 #			func entry, preferably for every step in stepFuncs)
+#		Add step over functionality
 #		Add a way to step out of the currFunc
 
 

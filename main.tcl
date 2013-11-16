@@ -14,12 +14,15 @@ package require tooltip
 source [file join [file dirname [info script]] debug.tcl]
 source [file join [file dirname [info script]] gui.tcl]
 source [file join [file dirname [info script]] nl.tcl]
+source [file join [file dirname [info script]] rr.tcl]
 source [file join [file dirname [info script]] lookfeel.tcl]
 
 # Sets the list of funcs to be debugged. Should be an empty list some day
-dbg::setStepFuncs [list nl::makeNet]
-dbg::setVerboseFuncs [list main nl::makeNet]
+RR::setRecordFuncs [list nl::makeInst nl::makeRgn nl::makeNet]
+dbg::setStepFuncs [list]
+dbg::setVerboseFuncs [list RR::logFuncCall RR::replay RR::setRecordFuncs]
 
+#puts "RR:recordFuncs is $RR::recordFuncs"
 
 #source [file join [file dirname [info script]] defaultdesign.tcl]
 #source [file join [file dirname [info script]] random.tcl]
